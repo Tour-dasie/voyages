@@ -1,0 +1,238 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Plan de vols — Tour d'Asie</title>
+<style>
+:root{
+  --bg:#f4efe7; --panel:#fffdf9; --panel2:#f7f1e7;
+  --ink:#2f2a24; --ink2:#6b6154; --muted:#9a8f80;
+  --line:#e7ddcc; --acc:#bd5f39; --acc-soft:#f1ddcf;
+  --sage:#5c7a58; --sage-soft:#e4eede; --gold:#a9801f;
+  --shadow:0 6px 22px rgba(120,95,60,.10);
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#1b1916; --panel:#262320; --panel2:#2e2a25;
+    --ink:#f1eade; --ink2:#c4b9a8; --muted:#93887a;
+    --line:#39342c; --acc:#e2966c; --acc-soft:#3a2a20;
+    --sage:#8cb083; --sage-soft:#26302352; --gold:#d9b25f;
+    --shadow:0 8px 26px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="light"]{
+  --bg:#f4efe7; --panel:#fffdf9; --panel2:#f7f1e7; --ink:#2f2a24; --ink2:#6b6154; --muted:#9a8f80;
+  --line:#e7ddcc; --acc:#bd5f39; --acc-soft:#f1ddcf; --sage:#5c7a58; --sage-soft:#e4eede; --gold:#a9801f; --shadow:0 6px 22px rgba(120,95,60,.10);
+}
+:root[data-theme="dark"]{
+  --bg:#1b1916; --panel:#262320; --panel2:#2e2a25; --ink:#f1eade; --ink2:#c4b9a8; --muted:#93887a;
+  --line:#39342c; --acc:#e2966c; --acc-soft:#3a2a20; --sage:#8cb083; --sage-soft:#2a3326; --gold:#d9b25f; --shadow:0 8px 26px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:760px;margin:0 auto;padding:34px 18px 64px}
+h1,h2,h3{font-family:Georgia,"Iowan Old Style","Times New Roman",serif;font-weight:600;margin:0;text-wrap:balance;letter-spacing:-.01em}
+.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.16em;color:var(--acc);font-weight:700}
+h1{font-size:clamp(27px,5vw,38px);margin:8px 0 10px;line-height:1.08}
+.lede{color:var(--ink2);font-size:15.5px;max-width:60ch}
+.summary{display:flex;flex-wrap:wrap;gap:10px;margin:20px 0 6px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:11px 15px;box-shadow:var(--shadow)}
+.kpi .l{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700}
+.kpi .v{font-size:19px;font-weight:750;font-variant-numeric:tabular-nums;margin-top:2px}
+.legend{display:flex;gap:16px;flex-wrap:wrap;color:var(--ink2);font-size:13px;margin:16px 2px 6px}
+.legend b{color:var(--ink)}
+.legs{display:flex;flex-direction:column;gap:14px;margin-top:14px}
+.leg{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:17px 17px 15px;box-shadow:var(--shadow);position:relative}
+.leg.bus{background:var(--panel2)}
+.leg-h{display:flex;align-items:flex-start;gap:12px}
+.idx{flex:0 0 auto;width:27px;height:27px;border-radius:9px;background:var(--acc-soft);color:var(--acc);
+  font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums;margin-top:2px}
+.leg.bus .idx{background:var(--sage-soft);color:var(--sage)}
+.route{flex:1;min-width:0}
+.pins{font-size:13px;color:var(--muted)}
+.route h3{font-size:19px;margin-top:1px}
+.chip{flex:0 0 auto;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;
+  padding:5px 10px;border-radius:20px;white-space:nowrap}
+.chip.flight{background:var(--acc-soft);color:var(--acc)}
+.chip.bus{background:var(--sage-soft);color:var(--sage)}
+.leg-meta{color:var(--ink2);font-size:13.5px;margin:10px 0 0;font-variant-numeric:tabular-nums}
+.leg-note{color:var(--ink2);font-size:13.5px;margin:7px 0 0}
+.leg-note b{color:var(--ink)}
+.leg-foot{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:14px;padding-top:13px;border-top:1px solid var(--line)}
+.est{display:flex;flex-direction:column;line-height:1.15}
+.est .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:700}
+.est .v{font-size:17px;font-weight:800;font-variant-numeric:tabular-nums}
+.est .v small{font-size:11px;font-weight:600;color:var(--muted)}
+.book{font-size:12.5px;color:var(--ink2);background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:5px 11px;font-weight:600}
+.leg.bus .book{background:var(--panel)}
+.btn{margin-left:auto;background:var(--acc);color:#fff;text-decoration:none;font-weight:700;font-size:13.5px;
+  padding:10px 15px;border-radius:11px;white-space:nowrap;transition:transform .12s ease,filter .12s ease}
+.btn:hover{filter:brightness(1.06);transform:translateY(-1px)}
+.btn:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.btn.nomar{margin-left:0}
+.btn2{background:transparent;border:1.6px solid var(--acc);color:var(--acc);text-decoration:none;font-weight:700;font-size:13px;padding:8px 13px;border-radius:11px;white-space:nowrap;transition:background .12s ease}
+.btn2:hover{background:var(--acc-soft)}
+.btn2:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.search{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.busnote{margin-left:auto;font-size:12.5px;color:var(--sage);font-weight:700}
+.leg.done .idx{background:var(--sage-soft);color:var(--sage)}
+.chip.done{background:var(--sage-soft);color:var(--sage)}
+.done-pill{margin-left:auto;font-size:13px;color:var(--sage);font-weight:800}
+.chip.todo{background:var(--acc-soft);color:var(--gold)}
+.leg.todo{border-style:dashed}
+.flag{display:inline-block}
+.tips{margin-top:30px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:var(--shadow)}
+.tips h2{font-size:20px;margin-bottom:6px}
+.tips ul{margin:10px 0 0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:9px}
+.tips li{display:flex;gap:9px;font-size:14px;color:var(--ink2)}
+.tips li b{color:var(--ink)}
+.tips .ic{flex:0 0 auto}
+.flag-note{margin-top:20px;border-left:4px solid var(--gold);background:var(--panel);border:1px solid var(--line);border-left-width:4px;border-radius:12px;padding:14px 16px;font-size:13.5px;color:var(--ink2)}
+.flag-note b{color:var(--ink)}
+footer{margin-top:26px;color:var(--muted);font-size:12px;text-align:center;line-height:1.6}
+a.plain{color:var(--acc);font-weight:600}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+</head><body><div class="wrap">
+  <div class="eyebrow">Plan de vols · Tour d'Asie</div>
+  <h1>Vos vols, du moins cher au plus malin</h1>
+  <p class="lede">7 pays, 14 oct 2026 → 31 mai 2027, à deux. Sur tout l'itinéraire, <b>7 vols</b> valent le coup — l'aller Madrid→Pékin est déjà réservé ✅, il en reste <b>4 sûrs</b> + 2 « à confirmer » selon si vous allez aux Philippines (encore à décider). Les autres liaisons se font en bus. Chaque trajet a <b>deux boutons — Skyscanner et Google Flights —</b> pré-remplis avec vos dates.</p>
+
+  <div class="summary">
+    <div class="kpi"><div class="l">Vols à réserver</div><div class="v">4–6 <small style="font-size:12px;font-weight:600;color:var(--muted)">aller ✅ · selon 🇵🇭</small></div></div>
+    <div class="kpi"><div class="l">Budget vols restant</div><div class="v">≈ 1 900–4 000 €</div></div>
+    <div class="kpi"><div class="l">Pour</div><div class="v">2 voyageurs</div></div>
+  </div>
+  <div class="legend"><span>✈️ <b>Vol</b> — à réserver</span><span>🚌 <b>Bus</b> — pas de vol, on économise</span><span>💶 prix = estimation indicative /personne</span></div>
+
+  <div class="legs">
+
+    <article class="leg done">
+      <div class="leg-h"><span class="idx">✓</span>
+        <div class="route"><div class="pins">🇪🇸 Madrid → 🇨🇳 Pékin</div><h3>L'aller</h3></div>
+        <span class="chip done">✅ Réservé</span></div>
+      <div class="leg-meta">📅 ~14 oct 2026 · direct ~11 h</div>
+      <p class="leg-note">✈️ <b>Billet déjà pris</b> — rien à faire ! Pense juste à faire ton enregistrement en ligne ~24-48 h avant le départ.</p>
+      <div class="leg-foot">
+        <div class="est"><span class="l">Statut</span><span class="v" style="color:var(--sage)">Réservé</span></div>
+        <span class="done-pill">C'est fait ✅</span>
+      </div>
+    </article>
+
+    <article class="leg">
+      <div class="leg-h"><span class="idx">2</span>
+        <div class="route"><div class="pins">🇨🇳 Guilin → 🇯🇵 Fukuoka</div><h3>Chine → Japon</h3></div>
+        <span class="chip flight">✈️ Vol</span></div>
+      <div class="leg-meta">📅 ~9 nov 2026 · souvent 1 escale (Shanghai / Shenzhen)</div>
+      <p class="leg-note"><b>Le moins cher :</b> China Eastern ou Spring Airlines (low-cost), généralement via Shanghai. Compare aussi un départ depuis Guangzhou/Shenzhen si l'écart de prix est gros.</p>
+      <div class="leg-foot">
+        <div class="est"><span class="l">Estimation</span><span class="v">120–250 €<small> /pers</small></span></div>
+        <span class="book">🗓️ Réserver 1-2 mois avant</span>
+        <span class="search"><a class="btn nomar" href="https://www.skyscanner.net/transport/flights/kwl/fuk/261109/?adults=2" target="_blank" rel="noopener">🔎 Skyscanner</a><a class="btn2" href="https://www.google.com/travel/flights?q=Flights%20from%20Guilin%20to%20Fukuoka%20on%202026-11-09" target="_blank" rel="noopener">Google Flights</a></span>
+      </div>
+    </article>
+
+    <article class="leg">
+      <div class="leg-h"><span class="idx">3</span>
+        <div class="route"><div class="pins">🇯🇵 Tokyo → 🇹🇭 Chiang Mai</div><h3>Japon → Thaïlande</h3></div>
+        <span class="chip flight">✈️ Vol</span></div>
+      <div class="leg-meta">📅 ~14 déc 2026 · via Bangkok</div>
+      <p class="leg-note"><b>Le moins cher :</b> Tokyo → Bangkok en low-cost long-courrier (ZipAir, Scoot, AirAsia X), puis Bangkok → Chiang Mai (AirAsia/Nok, ~20-40 €). Parfois moins cher que le direct.</p>
+      <div class="leg-foot">
+        <div class="est"><span class="l">Estimation</span><span class="v">150–300 €<small> /pers</small></span></div>
+        <span class="book">🗓️ Réserver 2-3 mois avant</span>
+        <span class="search"><a class="btn nomar" href="https://www.skyscanner.net/transport/flights/tyoa/cnx/261214/?adults=2" target="_blank" rel="noopener">🔎 Skyscanner</a><a class="btn2" href="https://www.google.com/travel/flights?q=Flights%20from%20Tokyo%20to%20Chiang%20Mai%20on%202026-12-14" target="_blank" rel="noopener">Google Flights</a></span>
+      </div>
+    </article>
+
+    <article class="leg">
+      <div class="leg-h"><span class="idx">4</span>
+        <div class="route"><div class="pins">🇹🇭 Krabi → 🇰🇭 Phnom Penh</div><h3>Thaïlande → Cambodge</h3></div>
+        <span class="chip flight">✈️ Vol</span></div>
+      <div class="leg-meta">📅 ~27 jan 2027 · via Bangkok</div>
+      <p class="leg-note"><b>Le moins cher :</b> Krabi → Bangkok (AirAsia/Thai/Nok) puis Bangkok → Phnom Penh (AirAsia / Cambodia Angkor Air). Depuis les îles, Krabi est l'aéroport le plus pratique.</p>
+      <div class="leg-foot">
+        <div class="est"><span class="l">Estimation</span><span class="v">100–200 €<small> /pers</small></span></div>
+        <span class="book">🗓️ Réserver 1-2 mois avant</span>
+        <span class="search"><a class="btn nomar" href="https://www.skyscanner.net/transport/flights/kbv/pnh/270127/?adults=2" target="_blank" rel="noopener">🔎 Skyscanner</a><a class="btn2" href="https://www.google.com/travel/flights?q=Flights%20from%20Krabi%20to%20Phnom%20Penh%20on%202027-01-27" target="_blank" rel="noopener">Google Flights</a></span>
+      </div>
+    </article>
+
+    <article class="leg bus">
+      <div class="leg-h"><span class="idx">＝</span>
+        <div class="route"><div class="pins">🇰🇭 Kep → 🇻🇳 Saïgon</div><h3>Cambodge → Vietnam</h3></div>
+        <span class="chip bus">🚌 Bus</span></div>
+      <div class="leg-meta">📅 ~22 fév 2027 · ~6 h de route</div>
+      <p class="leg-note"><b>Pas besoin de vol :</b> bus direct Phnom Penh/Kep → Hô Chi Minh-Ville (Giant Ibis, Mekong Express). Simple, panoramique et très économique.</p>
+      <div class="leg-foot">
+        <div class="est"><span class="l">Estimation</span><span class="v">~15 €<small> /pers</small></span></div>
+        <span class="book">🎟️ Sur place ou 12go.asia</span>
+        <span class="busnote">Économie ✅</span>
+      </div>
+    </article>
+
+    <article class="leg">
+      <div class="leg-h"><span class="idx">5</span>
+        <div class="route"><div class="pins">🇻🇳 Hanoi → 🇱🇦 Vientiane</div><h3>Vietnam → Laos</h3></div>
+        <span class="chip flight">✈️ Vol</span></div>
+      <div class="leg-meta">📅 ~1 avr 2027 · direct ~1 h</div>
+      <p class="leg-note"><b>Le moins cher :</b> Vietnam Airlines ou Lao Airlines (vol court). Depuis Sapa, rejoins Hanoi en train/bus de nuit (~5-6 h) la veille. Le bus direct existe mais fait ~24 h — le vol vaut ses ~1 h.</p>
+      <div class="leg-foot">
+        <div class="est"><span class="l">Estimation</span><span class="v">80–150 €<small> /pers</small></span></div>
+        <span class="book">🗓️ Réserver 1-2 mois avant</span>
+        <span class="search"><a class="btn nomar" href="https://www.skyscanner.net/transport/flights/han/vte/270401/?adults=2" target="_blank" rel="noopener">🔎 Skyscanner</a><a class="btn2" href="https://www.google.com/travel/flights?q=Flights%20from%20Hanoi%20to%20Vientiane%20on%202027-04-01" target="_blank" rel="noopener">Google Flights</a></span>
+      </div>
+    </article>
+
+    <article class="leg todo">
+      <div class="leg-h"><span class="idx">6</span>
+        <div class="route"><div class="pins">🇱🇦 Luang Prabang → 🇵🇭 Coron</div><h3>Laos → Philippines</h3></div>
+        <span class="chip todo">❓ À confirmer</span></div>
+      <div class="leg-meta">📅 ~30 avr 2027 · via Manille · le trajet le plus complexe</div>
+      <p class="leg-note" style="color:var(--gold);font-weight:600">❓ Uniquement si vous décidez d'aller aux Philippines.</p>
+      <p class="leg-note"><b>Route la moins chère :</b> Luang Prabang → Bangkok → Manille (AirAsia / Cebu Pacific), puis <b>Manille → Coron (aéroport USU/Busuanga)</b> avec Cebu Pacific ou AirAsia (~35-75 €, petits avions). Réserve le vol Manille→Coron <b>tôt</b> : peu de places.</p>
+      <div class="leg-foot">
+        <div class="est"><span class="l">Estimation (total)</span><span class="v">250–450 €<small> /pers</small></span></div>
+        <span class="book">🗓️ Manille→Coron : réserver tôt</span>
+        <span class="search"><a class="btn nomar" href="https://www.skyscanner.net/transport/flights/lpq/mnl/270429/?adults=2" target="_blank" rel="noopener">🔎 Skyscanner</a><a class="btn2" href="https://www.google.com/travel/flights?q=Flights%20from%20Luang%20Prabang%20to%20Manila%20on%202027-04-29" target="_blank" rel="noopener">Google Flights</a></span>
+      </div>
+    </article>
+
+    <article class="leg todo">
+      <div class="leg-h"><span class="idx">7</span>
+        <div class="route"><div class="pins">🏁 Retour vers 🇪🇸 Madrid</div><h3>Le retour — selon votre décision</h3></div>
+        <span class="chip todo">❓ À caler</span></div>
+      <div class="leg-meta">📅 ~fin mai 2027 · 1 escale (pas de vol direct)</div>
+      <p class="leg-note"><b>Deux scénarios, selon les Philippines :</b></p>
+      <p class="leg-note">🅰️ <b>Avec les Philippines →</b> retour depuis <b>Manille</b> (Coron → Manille, puis Manille → Madrid via Doha / Istanbul / Dubaï). ~450-650 €/pers.</p>
+      <p class="leg-note">🅱️ <b>Sans les Philippines →</b> le voyage se termine côté Thaïlande : retour depuis <b>Bangkok</b>, souvent moins cher. ~400-600 €/pers.</p>
+      <div class="leg-foot" style="flex-direction:column;align-items:stretch;gap:9px">
+        <span class="search" style="margin-left:0"><a class="btn nomar" href="https://www.skyscanner.net/transport/flights/mnl/mad/270531/?adults=2" target="_blank" rel="noopener">🅰️ Skyscanner · Manille→Madrid</a><a class="btn2" href="https://www.google.com/travel/flights?q=Flights%20from%20Manila%20to%20Madrid%20on%202027-05-31" target="_blank" rel="noopener">Google Flights</a></span>
+        <span class="search" style="margin-left:0"><a class="btn nomar" href="https://www.skyscanner.net/transport/flights/bkk/mad/270531/?adults=2" target="_blank" rel="noopener" style="background:var(--sage)">🅱️ Skyscanner · Bangkok→Madrid</a><a class="btn2" href="https://www.google.com/travel/flights?q=Flights%20from%20Bangkok%20to%20Madrid%20on%202027-05-31" target="_blank" rel="noopener">Google Flights</a></span>
+      </div>
+    </article>
+
+  </div>
+
+  <div class="flag-note">
+    <b>❓ Les Philippines ne sont pas encore décidées — et c'est ok :</b><br>
+    • Les <b>vols 1 à 5 sont sûrs</b> quoi qu'il arrive. Seuls les vols <b>6 et 7</b> dépendent de ce choix, donc rien ne presse.<br>
+    • <b>Si vous y allez :</b> vol Laos → Manille → Coron, puis retour depuis Manille (🅰️).<br>
+    • <b>Si vous zappez :</b> vous gardez ~1 mois libre en mai (plages de Thaïlande, Indonésie…?) et rentrez depuis Bangkok (🅱️), souvent moins cher.<br>
+    • Dis-moi quand c'est tranché, je fige le plan.
+  </div>
+
+  <div class="tips">
+    <h2>Mes astuces d'agent pour payer moins</h2>
+    <ul>
+      <li><span class="ic">🔔</span><span><b>Active les alertes de prix</b> sur Google Flights pour l'aller (Madrid→Pékin) et le retour (Manille→Madrid) : tu es notifiée quand ça baisse.</span></li>
+      <li><span class="ic">🧳</span><span><b>Attention aux bagages en soute</b> sur les low-cost (AirAsia, Cebu, Scoot, VietJet) : le prix affiché est souvent sans valise. Ajoute ~15-40 €/vol pour vos gros sacs — compare au vrai total.</span></li>
+      <li><span class="ic">📅</span><span><b>Long-courriers (aller + retour) :</b> 2-4 mois avant. <b>Vols internes en Asie :</b> 1-2 mois avant. Les « deals de dernière minute » sont un mythe, les prix montent dans les 3 dernières semaines.</span></li>
+      <li><span class="ic">🔀</span><span><b>Regarde un billet « multi-destinations »</b> pour l'aller + le retour long-courrier : parfois moins cher que deux allers simples séparés.</span></li>
+      <li><span class="ic">🕵️</span><span><b>Compare toujours 2 moteurs</b> (Google Flights + Skyscanner) et réserve en navigation privée. Paie en euros pour éviter les frais de change.</span></li>
+      <li><span class="ic">🇨🇳</span><span><b>Vols internes en Chine</b> (Xi'an→Zhangjiajie, etc.) : à réserver sur <a class="plain" href="https://www.trip.com" target="_blank" rel="noopener">Trip.com</a>, souvent moins chers que sur Google. Déjà comptés dans le budget Chine.</span></li>
+    </ul>
+  </div>
+
+  <footer>Estimations indicatives à deux, hors vols internes chinois — les prix réels s'affichent via les liens.<br>Je ne réserve rien automatiquement : tu gardes la main sur chaque achat.</footer>
+</div>
+</body></html>
