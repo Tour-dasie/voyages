@@ -1,0 +1,1265 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#f4efe7">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Mes voyages">
+<title>Carnet de voyage</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4efe7; --bg2:#ece5d9; --card:#fffdf9; --card2:#f7f1e7;
+  --ink:#332f29; --ink2:#5f584e; --muted:#9a9084; --faint:#c3b8a8;
+  --line:#e8dfd0; --line2:#ddd2be;
+  --acc:#c67c5b; --acc-d:#a35e3e; --acc-soft:#f0dccf;
+  --sage:#8ba888; --sage-d:#5f7d5c;
+  --blue:#7ea6c0; --blue-d:#4d7893;
+  --gold:#cdaa5f; --gold-d:#96742f;
+  --plum:#a98cae; --rose:#c98a83;
+  --green:#6fae7c; --red:#cf7a6a;
+  --r:18px; --sh:0 4px 18px rgba(120,100,70,.10); --sh2:0 8px 30px rgba(120,100,70,.16);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-size:15px; line-height:1.5; padding-bottom:80px; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:640px;margin:0 auto;padding:0 15px}
+h1,h2,h3{margin:0;font-weight:750;letter-spacing:-.01em}
+.hidden{display:none!important}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+a{color:var(--blue-d)}
+img{max-width:100%}
+
+header{position:sticky;top:0;z-index:20;background:rgba(244,239,231,.86);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);padding:calc(env(safe-area-inset-top) + 11px) 0 10px}
+.hrow{display:flex;align-items:center;justify-content:space-between}
+.htitle{font-size:17px;font-weight:800;display:flex;align-items:center;gap:8px;color:var(--ink)}
+.htitle .globe{font-size:19px}
+.hbtns{display:flex;gap:7px}
+.iconbtn{width:37px;height:37px;border-radius:12px;background:var(--card);border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:var(--sh)}
+.iconbtn:active{background:var(--card2)}
+
+.view{padding:16px 0 8px;animation:fade .28s ease}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:14px;box-shadow:var(--sh)}
+.card.tight{padding:13px 15px}
+.sec-title{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:750;margin:4px 4px 10px}
+
+/* HERO photo */
+.phero{position:relative;border-radius:22px;overflow:hidden;margin-bottom:14px;box-shadow:var(--sh2);
+  min-height:186px;display:flex;flex-direction:column;justify-content:flex-end;
+  background-image:linear-gradient(180deg,rgba(40,32,24,.05),rgba(40,32,24,.62)),
+    url('https://images.unsplash.com/photo-1573824398985-ca6aee6b0cbd?w=1000&q=70&auto=format&fit=crop'),
+    linear-gradient(135deg,#d8a98f,#b06f4e);
+  background-size:cover;background-position:center}
+.phero .pc{position:relative;padding:20px;color:#fff}
+.phero .badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+  background:rgba(255,255,255,.22);color:#fff;padding:4px 11px;border-radius:20px;margin-bottom:10px;backdrop-filter:blur(4px)}
+.phero .big{font-size:38px;font-weight:800;line-height:1.02;letter-spacing:-.02em;text-shadow:0 2px 12px rgba(0,0,0,.35)}
+.phero .big small{font-size:15px;font-weight:600;opacity:.92}
+.phero .sub{margin-top:8px;font-size:13.5px;opacity:.95;text-shadow:0 1px 6px rgba(0,0,0,.4)}
+.phero .cur{font-size:21px;font-weight:800;display:flex;align-items:center;gap:9px;text-shadow:0 2px 10px rgba(0,0,0,.4)}
+.pbar{height:9px;border-radius:6px;background:rgba(255,255,255,.28);overflow:hidden;margin-top:14px}
+.pbar>i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,#fff,#ffe4c4)}
+.pmeta{display:flex;justify-content:space-between;font-size:12px;opacity:.95;margin-top:7px}
+
+/* light hero (non-photo) */
+.lhero{background:linear-gradient(135deg,var(--acc-soft),#f6ede2);border:1px solid var(--line);border-radius:22px;
+  padding:20px;margin-bottom:14px;box-shadow:var(--sh)}
+.lhero .badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+  background:#fff;color:var(--acc-d);padding:4px 11px;border-radius:20px;margin-bottom:10px}
+.lhero .big{font-size:34px;font-weight:800;color:var(--ink);letter-spacing:-.02em}
+.lhero .big small{font-size:15px;font-weight:600;color:var(--ink2)}
+.lhero .pbar{background:#fff}.lhero .pbar>i{background:linear-gradient(90deg,var(--acc),var(--gold))}
+.lhero .pmeta{color:var(--ink2);opacity:1}
+
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:14px 10px;text-align:center;box-shadow:var(--sh)}
+.stat .n{font-size:21px;font-weight:800;letter-spacing:-.02em;color:var(--acc-d)}
+.stat .l{font-size:10.5px;color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+
+/* photo strip */
+.strip{display:flex;gap:10px;overflow-x:auto;padding:2px 0 6px;margin:0 -15px;padding-left:15px;padding-right:15px;-webkit-overflow-scrolling:touch}
+.strip::-webkit-scrollbar{display:none}
+.pcard{flex:0 0 auto;width:150px;height:104px;border-radius:14px;overflow:hidden;position:relative;box-shadow:var(--sh);border:1px solid var(--line)}
+.pcard .im{width:100%;height:100%;object-fit:cover;background:var(--card2)}
+.pcard .cap{position:absolute;left:0;right:0;bottom:0;padding:16px 9px 7px;font-size:11px;font-weight:600;color:#fff;
+  background:linear-gradient(transparent,rgba(0,0,0,.72));text-shadow:0 1px 4px rgba(0,0,0,.5)}
+
+.mini{display:flex;gap:10px;align-items:flex-start;padding:11px 0;border-top:1px solid var(--line)}
+.mini:first-child{border-top:none}
+.mini .dot{flex:0 0 auto;width:9px;height:9px;border-radius:50%;margin-top:6px;background:var(--acc)}
+.mini .txt{flex:1}.mini .t{font-weight:650}.mini .d{font-size:12.5px;color:var(--ink2);margin-top:1px}
+
+/* ITINERARY */
+.stage{background:var(--card);border:1px solid var(--line);border-radius:var(--r);margin-bottom:13px;overflow:hidden;box-shadow:var(--sh)}
+.banner{position:relative;height:120px;background-size:cover;background-position:center;cursor:pointer;display:flex;align-items:flex-end}
+.banner .bov{position:relative;width:100%;padding:12px 15px;display:flex;align-items:center;gap:11px;color:#fff}
+.banner .fl{font-size:27px;filter:drop-shadow(0 1px 3px rgba(0,0,0,.4))}
+.banner .bi{flex:1;min-width:0}
+.banner .nm{font-weight:800;font-size:18px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;text-shadow:0 1px 6px rgba(0,0,0,.5)}
+.banner .meta{font-size:12.5px;margin-top:2px;text-shadow:0 1px 5px rgba(0,0,0,.6);opacity:.96}
+.banner .chev{font-size:13px;text-shadow:0 1px 4px rgba(0,0,0,.6);transition:transform .25s}
+.stage.open .banner .chev{transform:rotate(90deg)}
+.banner .photobtn{position:absolute;top:9px;right:10px;width:32px;height:32px;border-radius:10px;background:rgba(0,0,0,.34);
+  backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff}
+.ringw{position:absolute;top:9px;left:10px}
+.tag{font-size:10px;font-weight:750;padding:2px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.03em}
+.tag.val{background:rgba(255,255,255,.9);color:var(--sage-d)}
+.tag.add{background:rgba(255,255,255,.9);color:var(--plum)}
+.tag.now{background:#fff;color:var(--acc-d)}
+.ring{width:40px;height:40px;position:relative}
+.ring svg{transform:rotate(-90deg)}
+.ring .pct{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+.stage-body{display:none;padding:2px 15px 10px}
+.stage.open .stage-body{display:block}
+.sb-line{display:flex;gap:9px;font-size:13px;color:var(--ink2);padding:9px 0;border-top:1px solid var(--line);align-items:flex-start}
+.sb-line .k{flex:0 0 74px;color:var(--muted);font-weight:700;text-transform:uppercase;font-size:11px;letter-spacing:.03em;padding-top:1px}
+.film{background:var(--card2);border:1px solid var(--line);border-radius:13px;padding:11px 13px;margin:11px 0;font-size:12.8px;color:var(--ink2)}
+.film b{color:var(--gold-d)}
+.spots{display:flex;flex-wrap:wrap;gap:6px;padding:11px 2px 5px;border-top:1px solid var(--line);margin-top:2px}
+.spots-l{flex-basis:100%;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:750;margin-bottom:3px}
+.spot{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;color:var(--blue-d);
+  background:var(--card2);border:1px solid var(--line2);border-radius:20px;padding:6px 11px;text-decoration:none;line-height:1.2}
+.spot::before{content:"📍";font-size:11px}
+.spot:active{background:var(--acc-soft);border-color:var(--acc)}
+.dtx .spots{margin-top:9px}
+.day.done .dtx .spots,.day.done .dtx .spots *{text-decoration:none}
+.wish{cursor:pointer;font-size:16px;line-height:1;color:var(--faint);padding:1px 4px 1px 0;flex:0 0 auto}
+.wish.on{color:#e8b64a}
+.resto .spot{color:var(--sage-d)}
+.resto .spot-p{color:var(--sage-d);background:#e7f0e0;border-color:var(--sage)}
+.resto-toggle{cursor:pointer;display:inline-flex;align-items:center;gap:6px;margin-bottom:0}
+.resto .rcount{background:#e7f0e0;color:var(--sage-d);border:1px solid var(--sage);border-radius:20px;padding:0 7px;font-size:10px;line-height:16px;font-weight:800}
+.resto .rchev{transition:transform .2s;font-size:11px;color:var(--muted)}
+.resto.folded .resto-list{display:none}
+.resto:not(.folded) .rchev{transform:rotate(180deg)}
+.resto .resto-list{flex-basis:100%;display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.social.folded .resto-list{display:none}
+.social:not(.folded) .rchev{transform:rotate(180deg)}
+.social .spots-l{color:var(--plum)}
+.so-item{flex-basis:100%;font-size:12.8px;color:var(--ink2);line-height:1.46;margin:2px 0}
+.so-cap{flex-basis:100%;font-size:12.8px;color:var(--ink);background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:8px 11px;margin:4px 0;line-height:1.46}
+.so-tag{flex-basis:100%;font-size:12px;color:var(--blue-d);font-weight:600;margin-top:4px;word-break:break-word}
+.prat{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--red);border-radius:14px;margin:11px 0 3px;overflow:hidden;box-shadow:var(--sh)}
+.prat-h{cursor:pointer;padding:11px 14px;font-weight:800;font-size:13.5px;color:var(--ink);display:flex;align-items:center;gap:7px}
+.prat-off{color:var(--muted);font-weight:600;font-size:11.5px}
+.prat-h .rchev{margin-left:auto;transition:transform .2s;font-size:11px;color:var(--muted)}
+.prat:not(.folded) .prat-h .rchev{transform:rotate(180deg)}
+.prat.folded .prat-body{display:none}
+.prat-body{padding:0 14px 12px}
+.prat-row{padding:9px 0;border-top:1px solid var(--line);font-size:12.8px;color:var(--ink2);line-height:1.5}
+.prat-row>b{color:var(--ink);font-size:12px;text-transform:uppercase;letter-spacing:.02em;display:block;margin-bottom:3px}
+.phr{padding:3px 0;font-size:12.6px;color:var(--ink2)}
+.phr-loc{font-weight:700;color:var(--ink)}
+.phr-ph{color:var(--muted);font-style:italic;font-size:11.5px}
+
+.block{margin:9px 0;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--card)}
+.block-h{display:flex;align-items:center;gap:11px;padding:11px 12px}
+.block-h .bt{flex:1}.block-h .bt .c{font-weight:750}.block-h .bt .dd{font-size:12px;color:var(--muted);margin-top:1px}
+.block-h .exp{color:var(--faint);font-size:12px;padding:4px}
+.block-h .mapl{flex:0 0 auto;width:30px;height:30px;border-radius:9px;background:var(--card2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:13px;text-decoration:none;margin-right:2px}
+.block-h .mapl:active{background:var(--acc-soft)}
+.days{display:none;padding:0 12px 8px}
+.block.open .days{display:block}
+.day{display:flex;gap:10px;padding:9px 0;border-top:1px solid var(--line);align-items:flex-start}
+.day .num{flex:0 0 auto;font-size:11px;font-weight:800;color:var(--acc-d);background:var(--acc-soft);border-radius:8px;padding:3px 7px;min-width:34px;text-align:center}
+.day .dtx{flex:1;font-size:13.3px}.day .dtx .dc{font-weight:700}
+.day.done .dtx,.block-h.done .bt{opacity:.45;text-decoration:line-through;text-decoration-color:var(--faint)}
+
+.cb{width:23px;height:23px;border-radius:8px;border:2px solid var(--line2);background:var(--card);
+  display:flex;align-items:center;justify-content:center;flex:0 0 auto;transition:.15s}
+.cb.on{background:var(--sage);border-color:var(--sage)}
+.cb.on::after{content:"✓";color:#fff;font-weight:800;font-size:13px}
+.cb.big{width:26px;height:26px}
+
+/* BUDGET */
+.bud-hero{background:linear-gradient(135deg,#dce7d6,#eef2e6)}
+.bud-hero .badge{color:var(--sage-d)}.bud-hero .big{color:var(--ink)}
+.bud-hero .pbar>i{background:linear-gradient(90deg,var(--sage),var(--blue))}
+.bud-tot{font-size:33px;font-weight:800;letter-spacing:-.02em;color:var(--ink)}
+.bud-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
+.bud-row .lab{color:var(--ink2);font-size:13px}
+.cat-line{display:flex;align-items:center;gap:10px;padding:11px 0;border-top:1px solid var(--line)}
+.cat-line:first-child{border-top:none}
+.cat-line .fl{font-size:19px;width:24px;text-align:center}
+.cat-line .nm{flex:1;font-weight:650}
+.cat-line .amt{text-align:right;font-variant-numeric:tabular-nums}
+.cat-line .amt .r{font-weight:750}.cat-line .amt .p{font-size:11.5px;color:var(--muted)}
+.tinybar{height:6px;border-radius:4px;background:var(--card2);overflow:hidden;margin-top:6px;border:1px solid var(--line)}
+.tinybar>i{display:block;height:100%;border-radius:4px}
+.exp-item{display:flex;gap:11px;align-items:center;padding:11px 0;border-top:1px solid var(--line)}
+.exp-item .em{font-size:18px;width:22px;text-align:center}
+.exp-item .ei{flex:1;min-width:0}.exp-item .ei .t{font-weight:650;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.exp-item .ei .s{font-size:11.5px;color:var(--muted)}
+.exp-item .ea{font-weight:750;font-variant-numeric:tabular-nums}
+.exp-item .del{color:var(--faint);padding:6px;font-size:14px}
+
+/* REMINDERS */
+.seg{display:flex;background:var(--bg2);border-radius:13px;padding:4px;margin-bottom:16px;border:1px solid var(--line)}
+.seg button{flex:1;padding:9px;border-radius:10px;font-size:13px;font-weight:700;color:var(--ink2)}
+.seg button.on{background:var(--card);color:var(--acc-d);box-shadow:var(--sh)}
+.rem{display:flex;gap:12px;align-items:flex-start;padding:13px 14px;background:var(--card);border:1px solid var(--line);
+  border-radius:14px;margin-bottom:9px;box-shadow:var(--sh);position:relative;overflow:hidden}
+.rem .barcol{position:absolute;left:0;top:0;bottom:0;width:4px}
+.rem .icn{font-size:20px;width:26px;text-align:center;flex:0 0 auto}
+.rem .ri{flex:1;min-width:0}
+.rem .ri .t{font-weight:700;font-size:14px}
+.rem .ri .s{font-size:12px;color:var(--muted);margin-top:2px}
+.rem .ri .when{font-size:11.5px;font-weight:700;margin-top:5px;display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:20px}
+.rem.done .ri .t,.rem.done .ri .s{opacity:.45;text-decoration:line-through;text-decoration-color:var(--faint)}
+.w-soon{background:#fdeee6;color:var(--acc-d)}.w-now{background:#fbe4dc;color:#b34e34}.w-late{background:#f7dcd6;color:#b0402c}
+.w-far{background:var(--card2);color:var(--muted)}.w-done{background:#e3f0e0;color:var(--sage-d)}
+.bell{font-size:11px;color:var(--gold-d);margin-top:5px;display:flex;align-items:center;gap:4px}
+.flight{display:flex;gap:12px;align-items:center;padding:13px 14px;background:var(--card);border:1px solid var(--line);
+  border-radius:14px;margin-bottom:9px;box-shadow:var(--sh)}
+.flight .fr{flex:1}
+.flight .fr .rt{font-weight:750;font-size:14.5px;display:flex;align-items:center;gap:7px}
+.flight .fr .dt{font-size:12px;color:var(--muted);margin-top:2px}
+.flight .fr .ci{font-size:11.5px;font-weight:700;margin-top:5px;display:inline-block;padding:2px 8px;border-radius:20px}
+.flight .del{color:var(--faint);padding:6px;font-size:14px}
+
+/* CHECKLIST */
+.ck-when{font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--gold-d);
+  margin:16px 4px 9px;display:flex;align-items:center;gap:7px}
+.ck-item{display:flex;gap:12px;align-items:flex-start;padding:13px 14px;background:var(--card);
+  border:1px solid var(--line);border-radius:13px;margin-bottom:8px;box-shadow:var(--sh)}
+.ck-item .ci{flex:1}.ck-item .ci .t{font-weight:650;font-size:14px}.ck-item .ci .s{font-size:12.5px;color:var(--muted);margin-top:2px}
+.ck-item.done .ci{opacity:.45;text-decoration:line-through;text-decoration-color:var(--faint)}
+
+/* MAP */
+#map{height:calc(100vh - 250px);min-height:360px;border-radius:var(--r);border:1px solid var(--line);overflow:hidden;box-shadow:var(--sh);touch-action:none}
+.leaflet-container{touch-action:none!important}
+.leaflet-container{background:#e8e0d2;font-family:inherit}
+.legend{display:flex;flex-wrap:wrap;gap:7px 13px;margin:12px 3px 0;font-size:12px;color:var(--ink2)}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.pop b{font-size:14px}.pop .pm{color:#777;font-size:12px}
+
+.nav{position:fixed;left:0;right:0;bottom:0;z-index:30;background:rgba(255,253,249,.95);backdrop-filter:blur(12px);
+  border-top:1px solid var(--line);display:flex;padding:6px 2px calc(env(safe-area-inset-bottom) + 6px)}
+.nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 1px;color:var(--muted);font-size:10px;font-weight:650}
+.nav button .ic{font-size:19px;line-height:1;filter:grayscale(.3) opacity(.75)}
+.nav button.on{color:var(--acc-d)}
+.nav button.on .ic{filter:none}
+
+.overlay{position:fixed;inset:0;z-index:50;background:rgba(50,40,28,.42);backdrop-filter:blur(2px);display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--bg);border-top-left-radius:24px;border-top-right-radius:24px;width:100%;max-width:640px;
+  padding:18px 18px calc(env(safe-area-inset-bottom) + 20px);max-height:90vh;overflow:auto;animation:up .3s cubic-bezier(.2,.8,.2,1);box-shadow:0 -8px 40px rgba(0,0,0,.2)}
+@keyframes up{from{transform:translateY(100%)}to{transform:none}}
+.sheet h3{font-size:18px;margin-bottom:6px;color:var(--ink)}
+.grabber{width:42px;height:5px;border-radius:3px;background:var(--line2);margin:0 auto 15px}
+label.fl-l{display:block;font-size:11.5px;color:var(--muted);font-weight:700;margin:13px 0 6px;text-transform:uppercase;letter-spacing:.04em}
+input,select,textarea{width:100%;background:var(--card);border:1px solid var(--line2);color:var(--ink);border-radius:12px;padding:12px 13px;font-size:16px;font-family:inherit}
+input:focus,select:focus{outline:none;border-color:var(--acc)}
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chip{padding:9px 13px;border-radius:11px;background:var(--card);border:1px solid var(--line2);font-size:13px;font-weight:650;color:var(--ink2)}
+.chip.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.btn{width:100%;padding:14px;border-radius:13px;background:var(--acc);color:#fff;font-weight:800;font-size:15px;margin-top:18px;box-shadow:var(--sh)}
+.btn.ghost{background:var(--card);color:var(--ink2);border:1px solid var(--line2);font-weight:650;box-shadow:none}
+.row2{display:flex;gap:10px}.row2>*{flex:1}
+.fab{position:fixed;right:16px;bottom:calc(env(safe-area-inset-bottom) + 84px);z-index:25;width:56px;height:56px;border-radius:50%;
+  background:var(--acc);color:#fff;font-size:28px;box-shadow:0 8px 22px rgba(198,124,91,.5);display:flex;align-items:center;justify-content:center}
+.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 92px);transform:translateX(-50%);
+  background:var(--ink);border:1px solid var(--ink);color:#fff;padding:11px 18px;border-radius:14px;font-size:13px;font-weight:650;z-index:60;box-shadow:var(--sh2);opacity:0;transition:.3s;pointer-events:none;max-width:88%}
+.toast.show{opacity:1}
+.empty{text-align:center;color:var(--faint);padding:26px 10px;font-size:13.5px}
+.info{background:linear-gradient(135deg,#eef2e6,#f6ede2);border:1px solid var(--line);border-radius:14px;padding:13px 14px;font-size:12.8px;color:var(--ink2);margin-bottom:14px}
+.info b{color:var(--ink)}
+#syncbtn{position:relative}
+.syncdot{position:absolute;top:4px;right:4px;width:9px;height:9px;border-radius:50%;border:2px solid var(--card);background:var(--faint);transition:.3s}
+.syncdot.on{background:var(--green)}
+.syncdot.connecting{background:var(--gold);animation:pulse 1s infinite}
+.syncdot.err{background:var(--red)}
+.syncdot.off{background:var(--faint)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+textarea{width:100%;background:var(--card);border:1px solid var(--line2);color:var(--ink);border-radius:12px;padding:12px 13px;font-size:16px;font-family:inherit}
+/* écran de connexion — plein écran OPAQUE (vraie barrière, pas un flou) */
+.loginwrap{position:fixed;inset:0;z-index:2000;background:linear-gradient(160deg,var(--acc-soft),var(--bg2));
+  display:flex;align-items:center;justify-content:center;padding:24px;overflow:auto}
+.loginbox{width:100%;max-width:350px;background:var(--card);border:1px solid var(--line);border-radius:22px;
+  padding:28px 22px;box-shadow:var(--sh2);text-align:center}
+.loginbox .lg-logo{font-size:50px;line-height:1}
+.loginbox h2{font-size:22px;margin:8px 0 2px;color:var(--ink)}
+.loginbox .lg-sub{font-size:13px;color:var(--ink2);margin:0 0 6px}
+.loginbox label.fl-l{text-align:left}
+.loginbox .lg-foot{font-size:11.5px;color:var(--muted);margin-top:14px}
+/* quand verrouillé : tout le carnet est masqué */
+body.locked{overflow:hidden}
+body.locked header,body.locked main,body.locked .nav,body.locked #fab{display:none!important}
+/* --- Finition « pro » : police de titres (Fraunces) + logo de marque --- */
+:root{--disp:'Fraunces',Georgia,'Times New Roman',serif}
+.htitle{font-family:var(--disp);font-weight:700;letter-spacing:0;font-size:18px}
+.phero .big,.lhero .big{font-family:var(--disp);font-weight:600;letter-spacing:-.01em}
+.banner .nm{font-family:var(--disp);font-weight:600}
+.loginbox h2{font-family:var(--disp);font-weight:600;font-size:25px;margin-top:6px}
+.brandmark{width:27px;height:27px;border-radius:8px;box-shadow:0 2px 7px rgba(120,100,70,.28);display:block}
+.lg-logo-img{width:80px;height:80px;border-radius:21px;box-shadow:var(--sh2);margin:2px auto 8px;display:block}
+
+.tripitem{display:flex;align-items:center;gap:12px;padding:13px 12px;border:1px solid var(--line);border-radius:14px;margin-bottom:9px;cursor:pointer;background:var(--card)}
+.tripitem.on{border-color:var(--acc);background:var(--acc-soft)}
+.tripitem .te{font-size:24px;line-height:1}
+.tripitem .ti{flex:1;min-width:0}
+.tripitem .tn{font-weight:750;color:var(--ink)}
+.tripitem .td2{font-size:12px;color:var(--muted);margin-top:1px}
+.tripitem .tok{color:var(--acc-d);font-weight:800;font-size:16px}
+</style>
+</head>
+<body class="locked">
+
+<header>
+  <div class="wrap hrow">
+    <div class="htitle"><img class="brandmark" src="icon-192.png" alt=""> <span id="tripname">Mes voyages</span></div>
+    <div class="hbtns">
+      <button class="iconbtn" onclick="openTrips()" title="Changer de voyage">🧳</button>
+      <button class="iconbtn" id="syncbtn" onclick="openSync()" title="Synchronisation">☁️<span id="syncdot" class="syncdot off"></span></button>
+      <button class="iconbtn" onclick="openData()" title="Sauvegarde">💾</button>
+      <button class="iconbtn" onclick="nav('today')" title="Aujourd'hui">📍</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="v-today" class="view"></section>
+  <section id="v-itin" class="view hidden"></section>
+  <section id="v-map" class="view hidden">
+    <div class="sec-title">Le parcours</div>
+    <div style="position:relative;z-index:0">
+      <div id="mapctrl" style="position:absolute;z-index:600;top:9px;right:9px;display:flex;flex-direction:column;gap:6px;align-items:flex-end"></div>
+      <div id="map"></div>
+    </div>
+    <div class="legend" id="legend"></div>
+  </section>
+  <section id="v-budget" class="view hidden"></section>
+  <section id="v-rem" class="view hidden"></section>
+</main>
+
+<button id="fab" class="fab hidden" onclick="openExpense()">+</button>
+
+<nav class="nav">
+  <button data-v="today" class="on" onclick="nav('today')"><span class="ic">📍</span>Aujourd'hui</button>
+  <button data-v="itin" onclick="nav('itin')"><span class="ic">🗓️</span>Itinéraire</button>
+  <button data-v="map" onclick="nav('map')"><span class="ic">🗺️</span>Carte</button>
+  <button data-v="budget" onclick="nav('budget')"><span class="ic">💰</span>Budget</button>
+  <button data-v="rem" onclick="nav('rem')"><span class="ic">🔔</span>Rappels</button>
+</nav>
+
+<div id="toast" class="toast"></div>
+<div id="modal"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<script>
+/* ============ DONNÉES ============ */
+let TRIP_START="", TRIP_END=""; const TRAVELERS=2;
+const IMG=id=>`https://images.unsplash.com/photo-${id}?w=1000&q=70&auto=format&fit=crop`;
+
+let BUDGET_PREVU=[];
+const CATS=[
+  {id:"heberg",fl:"🛏️",nm:"Hébergement"},{id:"nourr",fl:"🍜",nm:"Nourriture"},
+  {id:"transp",fl:"🚄",nm:"Transport"},{id:"activ",fl:"🎫",nm:"Activités"},
+  {id:"visa",fl:"📋",nm:"Visa / Admin"},{id:"autre",fl:"🛍️",nm:"Autre"},
+];
+/* devises : saisie en monnaie locale, totaux convertis en euros */
+const CURRENCIES=[
+  {c:"EUR",s:"€",nm:"Euro"},{c:"USD",s:"$",nm:"Dollar US (Cambodge)"},{c:"CNY",s:"¥",nm:"Yuan (Chine)"},
+  {c:"JPY",s:"¥",nm:"Yen (Japon)"},{c:"THB",s:"฿",nm:"Baht (Thaïlande)"},{c:"VND",s:"₫",nm:"Dong (Vietnam)"},
+  {c:"LAK",s:"₭",nm:"Kip (Laos)"},{c:"PHP",s:"₱",nm:"Peso (Philippines)"},{c:"KHR",s:"៛",nm:"Riel (Cambodge)"},
+];
+/* taux indicatifs : combien vaut 1 unité en euros (modifiables dans l'app) */
+const DEFAULT_RATES={EUR:1,USD:0.92,CNY:0.128,JPY:0.0059,THB:0.026,VND:0.000036,LAK:0.000043,PHP:0.0157,KHR:0.00022};
+let COUNTRY_CUR={};
+// galerie d'ouverture (photos libres vérifiées, Unsplash)
+let GALLERY=[];
+
+let STAGES=[];
+
+/* rappels datés (r1-r11 = notification push programmée ; r12-r13 = activités) */
+let REMINDERS=[];
+
+let CHECK=[];
+
+/* ============ ÉTAT ============ */
+const KEY="tourdasie_v2";
+let TRIP=localStorage.getItem('td_trip')||'asie';
+let TRIPS={};
+function dataKey(){return KEY+'_'+TRIP;}
+function contentKey(){return 'tdcontent_'+TRIP;}
+/* Config du projet Firebase "tour-dasie" (identifiants publics côté client, pas secrets) */
+const FIREBASE_CONFIG={
+  apiKey:"AIzaSyAHQvnPU9LUMW2R6AAf1RHr2FuAjAhYRLM",
+  authDomain:"tour-dasie.firebaseapp.com",
+  databaseURL:"https://tour-dasie-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:"tour-dasie",
+  storageBucket:"tour-dasie.firebasestorage.app",
+  messagingSenderId:"769992610137",
+  appId:"1:769992610137:web:9af49a50d2ba3a32dc7c48"
+};
+const ESPACE="voyage";
+let S={days:{},blocks:{},check:{},expenses:[],reminders:{},flights:[],photos:{},rates:{},wishlist:{},settlements:[]};
+let SYNC={ref:null,dataRef:null,pushRef:null,db:null,applying:false,first:true,user:null,ready:false};
+function load(){S={days:{},blocks:{},check:{},expenses:[],reminders:{},flights:[],photos:{},rates:{},wishlist:{},settlements:[]};try{const r=localStorage.getItem(dataKey());if(r)S=Object.assign(S,JSON.parse(r));}catch(e){}}
+function save(){if(!SYNC.applying)S._updatedAt=Date.now();try{localStorage.setItem(dataKey(),JSON.stringify(S));}catch(e){toast("⚠️ Sauvegarde impossible");}pushCloud();}
+load();
+/* pré-remplissage à partir des confirmations trouvées dans Gmail (une seule fois) */
+function seedOnce(){}
+seedOnce();
+
+/* ============ SYNCHRO CLOUD (Firebase Realtime Database) ============ */
+let _pushT;
+function setSyncPill(state){const d=document.getElementById('syncdot');if(d)d.className='syncdot '+state;}
+function syncActive(){return !!(SYNC.user&&SYNC.dataRef);}
+function pushCloud(now){
+  if(!SYNC.dataRef||SYNC.applying)return;
+  clearTimeout(_pushT);
+  const doit=()=>{try{SYNC.dataRef.set({blob:JSON.stringify(S),_updatedAt:S._updatedAt||0});setSyncPill('on');}catch(e){setSyncPill('err');}};
+  if(now)doit();else _pushT=setTimeout(doit,700);
+}
+function applyRemoteData(d){
+  S={days:d.days||{},blocks:d.blocks||{},check:d.check||{},expenses:d.expenses||[],
+     reminders:d.reminders||{},flights:d.flights||[],photos:d.photos||{},rates:d.rates||{},wishlist:d.wishlist||{},settlements:d.settlements||[],
+     _updatedAt:d._updatedAt||Date.now(),_seed1:d._seed1||S._seed1};
+}
+/* fusion sans perte au 1er raccordement : on garde tout ce qui est coché des deux côtés */
+function mergeStates(a,b){
+  const m={days:{},blocks:{},check:{},reminders:{},photos:{},expenses:[],flights:[],rates:{},wishlist:{},settlements:[]};
+  ['days','blocks','check','reminders'].forEach(k=>{m[k]=Object.assign({},a[k]||{});const bb=b[k]||{};
+    for(const key in bb){if(bb[key])m[k][key]=true;else if(!(key in m[k]))m[k][key]=bb[key];}});
+  m.photos=Object.assign({},a.photos||{},b.photos||{});
+  const byId=arr=>{const o={};(arr||[]).forEach(x=>{o[x.id]=x;});return o;};
+  m.expenses=Object.values(Object.assign(byId(a.expenses),byId(b.expenses)));
+  m.flights=Object.values(Object.assign(byId(a.flights),byId(b.flights)));
+  m.settlements=Object.values(Object.assign(byId(a.settlements),byId(b.settlements)));
+  m.rates=Object.assign({},a.rates||{},b.rates||{});
+  m.wishlist=Object.assign({},a.wishlist||{},b.wishlist||{});
+  m._seed1=a._seed1||b._seed1;m._updatedAt=Math.max(a._updatedAt||0,b._updatedAt||0);
+  return m;
+}
+function lockUI(){document.body.classList.add('locked');['today','itin','budget','rem'].forEach(v=>{const el=document.getElementById('v-'+v);if(el)el.innerHTML='';});}
+function unlockUI(){document.body.classList.remove('locked');}
+/* ===== Multi-voyages : contenu chargé depuis Firebase (plus dans le code public) ===== */
+function applyContent(str){
+  try{var c=JSON.parse(str);if(!c||!c.STAGES||!c.STAGES.length)return false;
+    STAGES=c.STAGES; SOCIAL=c.SOCIAL||{}; PRATIQUE=c.PRATIQUE||{}; PACK=c.PACK||[];
+    RESTO_CO=c.RESTO_CO||{}; SPOT_CO=c.SPOT_CO||{}; REMINDERS=c.REMINDERS||[]; CHECK=c.CHECK||[]; BUDGET_PREVU=c.BUDGET_PREVU||[];
+    GALLERY=c.GALLERY||[]; COUNTRY_CUR=c.COUNTRY_CUR||{}; CFLAG=c.CFLAG||{};
+    if(STAGES.length){TRIP_START=STAGES[0].start||"";TRIP_END=STAGES[STAGES.length-1].end||"";}
+    return true;
+  }catch(e){return false;}
+}
+function clearContent(){STAGES=[];SOCIAL={};PRATIQUE={};PACK=[];RESTO_CO={};SPOT_CO={};REMINDERS=[];CHECK=[];BUDGET_PREVU=[];GALLERY=[];COUNTRY_CUR={};CFLAG={};}
+function fmtD(s){try{return new Date(s+'T00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'});}catch(e){return s;}}
+function tripDates(){return (TRIP_START&&TRIP_END)?('Du '+fmtD(TRIP_START)+' au '+fmtD(TRIP_END)):'';}
+function setTripName(){var m=TRIPS[TRIP]||{};var el=document.getElementById('tripname');if(el)el.textContent=m.name||'Voyage';}
+function bootTrips(){
+  firebase.database().ref('voyages/_index').once('value').then(function(s){
+    var v=s.val()||{}; if(Object.keys(v).length){TRIPS=v;}
+    var ks=Object.keys(TRIPS).filter(function(k){return k[0]!=='_';});
+    if(!TRIPS[TRIP]&&ks.length){ks.sort(function(a,b){return (TRIPS[a].order||99)-(TRIPS[b].order||99);});TRIP=ks[0];}
+    try{localStorage.setItem('td_trips',JSON.stringify(TRIPS));}catch(e){}
+    loadTrip(TRIP);
+  }).catch(function(){ try{TRIPS=JSON.parse(localStorage.getItem('td_trips')||'{}');}catch(e){TRIPS={};} loadTrip(TRIP); });
+}
+function loadTrip(id){
+  TRIP=id; try{localStorage.setItem('td_trip',TRIP);}catch(e){}
+  setTripName(); load(); seedOnce(); setSyncPill('connecting'); startSync();
+  var hadCache=false;
+  try{var c=localStorage.getItem(contentKey());if(c&&applyContent(c)){hadCache=true;renderAll();nav('today');}}catch(e){}
+  firebase.database().ref('voyages/'+TRIP+'/content').once('value').then(function(snap){
+    var v=snap.val();
+    if(v&&applyContent(v)){try{localStorage.setItem(contentKey(),v);}catch(e){}renderAll();if(!hadCache)nav('today');}
+    else if(!hadCache){clearContent();renderAll();nav('today');}
+  }).catch(function(){ if(!hadCache){renderAll();nav('today');} });
+}
+function switchTrip(id){
+  if(id===TRIP){closeModal();return;}
+  try{stopSync();}catch(e){}
+  try{if(typeof map!=='undefined'&&map&&map.remove)map.remove();}catch(e){}
+  mapInited=false; try{spotMarkers={};spotsLayer=null;}catch(e){}
+  closeModal(); loadTrip(id);
+  toast('Voyage : '+((TRIPS[id]||{}).name||id));
+}
+function openTrips(){
+  var ks=Object.keys(TRIPS).filter(function(k){return k[0]!=='_';}).sort(function(a,b){return (TRIPS[a].order||99)-(TRIPS[b].order||99);});
+  var rows=ks.map(function(id){var m=TRIPS[id]||{};var on=id===TRIP;
+    return '<div class="tripitem'+(on?' on':'')+'" onclick="switchTrip(\''+id+'\')"><span class="te">'+(m.emoji||'🧭')+'</span><div class="ti"><div class="tn">'+(m.name||id)+'</div><div class="td2">'+((m.start||'')+(m.end?(' → '+m.end):''))+'</div></div>'+(on?'<span class="tok">✓</span>':'')+'</div>';
+  }).join('');
+  if(!rows)rows='<p style="color:var(--ink2);font-size:14px">Aucun voyage disponible.</p>';
+  $('#modal').innerHTML='<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="sheet"><div class="grabber"></div><h3>🧳 Mes voyages</h3><p style="color:var(--ink2);font-size:13px;margin:0 2px 12px">Choisis le voyage à afficher. Tes données de chaque voyage sont séparées et synchronisées à deux.</p>'+rows+'<button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Fermer</button></div></div>';
+}
+
+function initFirebase(){
+  if(typeof firebase==='undefined'||!firebase.auth){
+    $('#modal').innerHTML=`<div class="loginwrap"><div class="loginbox"><div class="lg-logo">📡</div>
+      <h2>Connexion requise</h2><div class="lg-sub">Impossible de charger le carnet — vérifie ta connexion internet, puis recharge.</div>
+      <button class="btn" onclick="location.reload()">Recharger</button></div></div>`;
+    return;
+  }
+  try{
+    if(!firebase.apps.length)firebase.initializeApp(FIREBASE_CONFIG);
+    SYNC.ready=true;
+    firebase.auth().onAuthStateChanged(u=>{
+      SYNC.user=u||null;
+      if(u){unlockUI();closeModal();bootTrips();}
+      else{stopSync();lockUI();setSyncPill('off');showLogin();}
+    });
+  }catch(e){setSyncPill('err');}
+}
+function stopSync(){
+  try{if(SYNC.dataRef)SYNC.dataRef.off();}catch(e){}
+  SYNC.ref=null;SYNC.dataRef=null;SYNC.pushRef=null;SYNC.db=null;SYNC.first=true;
+}
+function startSync(){
+ try{
+    SYNC.db=firebase.database();
+    SYNC.ref=SYNC.db.ref('voyages/'+TRIP);
+    SYNC.dataRef=SYNC.ref.child('data');
+    SYNC.pushRef=SYNC.db.ref('push');
+    SYNC.first=true;
+    SYNC.dataRef.on('value',snap=>{
+      const remote=snap.val();
+      if(SYNC.first){
+        SYNC.first=false;
+        if(remote&&remote.blob){
+          let d=null;try{d=JSON.parse(remote.blob);}catch(e){}
+          if(d){SYNC.applying=true;applyRemoteData(mergeStates(S,d));SYNC.applying=false;
+            try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}renderAll();}
+        }
+        pushCloud(true);setSyncPill('on');return;
+      }
+      if(!remote||!remote.blob){setSyncPill('on');return;}
+      const rt=remote._updatedAt||0,lt=S._updatedAt||0;
+      if(rt>lt){let d=null;try{d=JSON.parse(remote.blob);}catch(e){return;}
+        SYNC.applying=true;applyRemoteData(d);SYNC.applying=false;
+        try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}renderAll();toast('☁️ Carnet synchronisé');}
+      setSyncPill('on');
+    },()=>setSyncPill('err'));
+  }catch(e){setSyncPill('err');}
+}
+function authErr(e){
+  const c=(e&&e.code)||'';
+  if(c.indexOf('wrong-password')>=0||c.indexOf('invalid-credential')>=0)return 'Mot de passe incorrect';
+  if(c.indexOf('user-not-found')>=0)return 'Aucun compte pour cet e-mail';
+  if(c.indexOf('invalid-email')>=0)return 'E-mail invalide';
+  if(c.indexOf('too-many-requests')>=0)return "Trop d'essais — réessaie dans un moment";
+  if(c.indexOf('network')>=0)return 'Pas de connexion internet';
+  return (e&&e.message)?e.message:'Connexion refusée';
+}
+function doLogin(){
+  const em=$('#lg-mail').value.trim(),pw=$('#lg-pass').value;
+  if(!em||!pw){toast('Entre ton e-mail et ton mot de passe');return;}
+  const btn=$('#lg-btn');if(btn){btn.textContent='Connexion…';btn.disabled=true;}
+  firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+    .then(()=>firebase.auth().signInWithEmailAndPassword(em,pw))
+    .then(()=>{toast('Connecté ✓');})
+    .catch(e=>{toast(authErr(e));if(btn){btn.textContent='Se connecter';btn.disabled=false;}});
+}
+function doLogout(){if(confirm('Se déconnecter de ce carnet sur cet appareil ?')){firebase.auth().signOut();toast('Déconnecté');}}
+function showLogin(){
+  if($('#lg-mail'))return;
+  $('#modal').innerHTML=`<div class="loginwrap"><div class="loginbox">
+    <img class="lg-logo-img" src="icon-192.png" alt="Carnet de voyage">
+    <h2>Mes voyages</h2>
+    <div class="lg-sub">Carnet privé — connexion requise</div>
+    <label class="fl-l">E-mail</label>
+    <input id="lg-mail" type="email" inputmode="email" autocomplete="username" placeholder="ton@email.com">
+    <label class="fl-l">Mot de passe</label>
+    <input id="lg-pass" type="password" autocomplete="current-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+    <button id="lg-btn" class="btn" onclick="doLogin()">Se connecter</button>
+    <div class="lg-foot">🔐 Seuls vos 2 comptes ont accès à ce carnet.</div>
+  </div></div>`;
+}
+function openSync(){
+  if(!SYNC.user){showLogin();return;}
+  $('#modal').innerHTML=`<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="sheet">
+    <div class="grabber"></div><h3>☁️ Mon carnet partagé</h3>
+    <div class="info" style="background:linear-gradient(135deg,#e3f0e0,#f6ede2)">✅ <b>Connecté</b> — <b>${SYNC.user.email}</b>. Tout ce que toi ou l'autre modifiez se synchronise en direct sur les deux téléphones.</div>
+    ${isiOS()&&!isStandalone()?`<div class="info" style="margin-bottom:10px">📱 <b>iPhone</b> : ouvre le menu <b>Partager</b> ⬆️ puis « <b>Sur l'écran d'accueil</b> », et rouvre le carnet depuis l'icône <b>avant</b> d'activer les notifications (exigence d'Apple).</div>`:''}
+    <button class="btn" onclick="enablePush()">🔔 Activer les notifications ici</button>
+    <button class="btn ghost" onclick="installApp()">📲 Installer sur l'écran d'accueil</button>
+    <button class="btn ghost" onclick="closeModal()">Fermer</button>
+    <button class="btn ghost" style="color:var(--red);margin-top:8px" onclick="doLogout()">Se déconnecter</button>
+  </div></div>`;
+}
+
+/* ============ APPLI INSTALLABLE + NOTIFICATIONS PUSH ============ */
+const VAPID_PUBLIC="BP_AP4FOamPTOp16r_xJ9B-BTE7JzAlRQdm3YyjdXmGidbZVC7wapqCyYOXqzgVOlP1Xlo356c-RHy7BLpqT5Ec";
+let swReg=null,deferredInstall=null;
+function b64ToU8(base64){const pad='='.repeat((4-base64.length%4)%4);const b=(base64+pad).replace(/-/g,'+').replace(/_/g,'/');
+  const raw=atob(b);const arr=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)arr[i]=raw.charCodeAt(i);return arr;}
+function isStandalone(){return window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;}
+function isiOS(){return /iphone|ipad|ipod/i.test(navigator.userAgent);}
+function pushSupported(){return('serviceWorker'in navigator)&&('PushManager'in window)&&('Notification'in window);}
+function initPWA(){
+  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js').then(r=>{swReg=r;}).catch(()=>{});}
+  window.addEventListener('beforeinstallprompt',ev=>{ev.preventDefault();deferredInstall=ev;});
+  window.addEventListener('offline',()=>setSyncPill('off'));
+  window.addEventListener('online',()=>{if(syncActive())setSyncPill('connecting');fetchRates(true);});
+}
+function installApp(){
+  if(deferredInstall){deferredInstall.prompt();deferredInstall.userChoice.finally(()=>{deferredInstall=null;});}
+  else if(isiOS())toast("Menu Partager ⬆️ → « Sur l'écran d'accueil »");
+  else toast("Menu du navigateur → « Installer / Ajouter à l'écran d'accueil »");
+}
+async function enablePush(){
+  if(!syncActive()){toast("Active d'abord la synchro ☁️ (les notifs en dépendent)");return;}
+  if(!pushSupported()){toast('Notifications non supportées sur ce navigateur');return;}
+  if(isiOS()&&!isStandalone()){toast("iPhone : ajoute d'abord à l'écran d'accueil, puis rouvre depuis l'icône");return;}
+  try{
+    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js');
+    await navigator.serviceWorker.ready;
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted'){toast('Notifications refusées dans les réglages');return;}
+    let sub=await swReg.pushManager.getSubscription();
+    if(!sub)sub=await swReg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64ToU8(VAPID_PUBLIC)});
+    const j=sub.toJSON();
+    const key=(j.keys&&j.keys.auth?j.keys.auth:('s'+Date.now())).replace(/[.#$\[\]\/]/g,'_');
+    if(SYNC.pushRef)await SYNC.pushRef.child(key).set({endpoint:j.endpoint,keys:j.keys,at:Date.now(),ua:navigator.userAgent.slice(0,120)});
+    swReg.showNotification("Carnet de voyage",{body:'✅ Notifications activées sur cet appareil !',icon:'icon-192.png',badge:'icon-192.png'});
+    toast('🔔 Notifications activées');closeModal();
+  }catch(e){toast('Échec notifs : '+(e&&e.message?e.message:e));}
+}
+
+/* ============ HELPERS ============ */
+const $=(s,r=document)=>r.querySelector(s);
+function today(){const d=new Date();return new Date(d.getFullYear(),d.getMonth(),d.getDate());}
+function pd(s){const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);}
+function dbtw(a,b){return Math.round((b-a)/864e5);}
+const eur=n=>Math.round(n).toLocaleString('fr-FR')+' €';
+const fdate=s=>pd(s).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'});
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._);t._=setTimeout(()=>t.classList.remove('show'),2100);}
+const cssId=s=>s.replace(/[^a-z0-9]/gi,'_');
+const esc=s=>s.replace(/'/g,"\\'");
+
+function stageUnits(st){let u=0;st.blocks.forEach(b=>{u+=b.days?b.days.length:1;});return u;}
+function stageDone(st){let d=0;st.blocks.forEach(b=>{if(b.days){b.days.forEach(dy=>{if(S.days[st.id+'-'+dy.n])d++;});}else{if(S.blocks[st.id+'-'+b.c])d++;}});return d;}
+function tripUnits(){return STAGES.reduce((a,s)=>a+stageUnits(s),0);}
+function tripDone(){return STAGES.reduce((a,s)=>a+stageDone(s),0);}
+function fmtRange(st){const o={day:'numeric',month:'short'};return pd(st.start).toLocaleDateString('fr-FR',o)+' → '+pd(st.end).toLocaleDateString('fr-FR',o);}
+function stagePhoto(st){return S.photos[st.id]||(st.photo?IMG(st.photo):null);}
+function bannerBg(st){
+  const url=stagePhoto(st),ov="linear-gradient(180deg,rgba(40,32,24,.12),rgba(40,32,24,.62))",
+    fb=`linear-gradient(135deg,${st.col},${shade(st.col,-22)})`;
+  return url?`background-image:${ov},url('${url}'),${fb}`:`background-image:${ov},${fb}`;
+}
+function shade(hex,p){let n=parseInt(hex.slice(1),16),r=(n>>16)+p,g=(n>>8&255)+p,b=(n&255)+p;
+  r=Math.max(0,Math.min(255,r));g=Math.max(0,Math.min(255,g));b=Math.max(0,Math.min(255,b));
+  return '#'+(1<<24|r<<16|g<<8|b).toString(16).slice(1);}
+
+/* ============ NAV ============ */
+let mapInited=false;
+function nav(v){
+  ['today','itin','map','budget','rem'].forEach(x=>{
+    $('#v-'+x).classList.toggle('hidden',x!==v);
+    document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+  });
+  $('#fab').classList.toggle('hidden',v!=='budget');
+  window.scrollTo(0,0);
+  if(v==='map'){setTimeout(initMap,60);if(mapInited)setTimeout(()=>map.invalidateSize(),80);}
+  if(v==='rem')askNotif();
+}
+
+/* ============ AUJOURD'HUI ============ */
+function renderToday(){
+  const t=today(),start=pd(TRIP_START),end=pd(TRIP_END),total=dbtw(start,end);
+  let cur=null;for(const st of STAGES){if(t>=pd(st.start)&&t<pd(st.end)){cur=st;break;}}
+  let html='';
+  if(t<start){
+    const dl=dbtw(t,start);
+    html+=`<div class="phero"><div class="pc">
+      <span class="badge">Compte à rebours</span>
+      <div class="big">J-${dl} <small>avant le départ</small></div>
+      <div class="sub">${tripDates()}</div>
+    </div></div>`;
+  } else if(t>=end){
+    html+=`<div class="phero"><div class="pc"><span class="badge">Voyage terminé</span>
+      <div class="big">🏡 De retour</div><div class="sub">7,5 mois · 6 pays · il reste les rushes à monter !</div></div></div>`;
+  } else {
+    const done=dbtw(start,t),pct=Math.round(done/total*100),ph=cur?stagePhoto(cur):null;
+    const bg=ph?`background-image:linear-gradient(180deg,rgba(40,32,24,.1),rgba(40,32,24,.66)),url('${ph}'),linear-gradient(135deg,${cur.col},${shade(cur.col,-22)})`:'';
+    html+=`<div class="phero" ${ph?`style="${bg};background-size:cover;background-position:center"`:''}><div class="pc">
+      <span class="badge">Jour ${done+1} / ${total}</span>
+      <div class="cur">${cur?cur.fl:'🌏'} ${cur?cur.nm:'En transit'}</div>
+      <div class="sub">${cur?cur.route:''}</div>
+      <div class="pbar"><i style="width:${pct}%"></i></div>
+      <div class="pmeta"><span>${pct}% parcouru</span><span>${dbtw(t,end)} jours restants</span></div>
+    </div></div>`;
+  }
+  const du=tripUnits(),dd=tripDone(),spent=S.expenses.reduce((a,e)=>a+toEur(e),0),prevu=BUDGET_PREVU.reduce((a,b)=>a+b.v,0);
+  html+=`<div class="stats">
+    <div class="stat"><div class="n">${dd}</div><div class="l">jours faits</div></div>
+    <div class="stat"><div class="n">${Math.round(dd/du*100)}%</div><div class="l">itinéraire</div></div>
+    <div class="stat"><div class="n">${eur(spent)}</div><div class="l">dépensé</div></div>
+  </div>`;
+
+  // prochain rappel
+  const next=nextReminder();
+  if(next){
+    const w=remWhen(next,t);
+    html+=`<div class="sec-title">Prochain rappel</div>
+    <div class="rem" onclick="nav('rem')"><span class="barcol" style="background:var(--acc)"></span>
+      <span class="icn">${next.icon}</span><div class="ri"><div class="t">${next.t}</div>
+      <div class="s">${next.s}</div><span class="when ${w.cls}">${w.label}</span>
+      ${next.push?'<div class="bell">🔔 notification push programmée</div>':''}</div></div>`;
+  }
+
+  // galerie
+  html+=`<div class="sec-title">Aperçu du voyage</div>
+  <div class="strip">${GALLERY.map(g=>`<div class="pcard"><img class="im" loading="lazy" src="${IMG(g.id)}" onerror="this.style.display='none'"><div class="cap">${g.c}</div></div>`).join('')}</div>`;
+
+  // suite du parcours
+  html+=`<div class="sec-title">La suite du parcours</div><div class="card">`;
+  let up=STAGES.filter(st=>pd(st.end)>t).slice(0,4);if(!up.length)up=STAGES.slice(-2);
+  up.forEach(st=>{const dsc=stageDone(st),tot=stageUnits(st),now=cur&&cur.id===st.id;
+    html+=`<div class="mini" onclick="nav('itin')"><span class="dot" style="background:${st.col}"></span>
+      <div class="txt"><div class="t">${st.fl} ${st.nm} ${now?'<span class="tag now" style="background:var(--acc-soft);color:var(--acc-d)">ici</span>':''}</div>
+      <div class="d">${fmtRange(st)} · ${st.days} j · ${dsc}/${tot} faits</div></div></div>`;});
+  html+=`</div>`;
+  $('#v-today').innerHTML=html;
+}
+function nextReminder(){const t=today();const pend=REMINDERS.filter(r=>!S.reminders[r.id]).sort((a,b)=>pd(a.date)-pd(b.date));
+  const late=pend.filter(r=>pd(r.date)<=t);if(late.length)return late[late.length-1];
+  const fut=pend.filter(r=>pd(r.date)>t);return fut[0]||null;}
+function remWhen(r,t){
+  if(S.reminders[r.id])return{cls:'w-done',label:'✓ fait'};
+  const d=dbtw(t,pd(r.date));
+  if(d<0)return{cls:'w-late',label:`⚠ à faire — échu depuis ${-d} j`};
+  if(d===0)return{cls:'w-now',label:"⚠ c'est le moment"};
+  if(d<=14)return{cls:'w-soon',label:`dans ${d} j — ${fdate(r.date)}`};
+  return{cls:'w-far',label:fdate(r.date)};
+}
+
+/* ============ ITINÉRAIRE ============ */
+let PRATIQUE={};
+function pratiqueHtml(st){
+  const p=(typeof PRATIQUE!=='undefined')?PRATIQUE[st.id]:null; if(!p)return '';
+  const phr=(p.phr||[]).map(x=>`<div class="phr"><span class="phr-fr">${x[0]}</span> → <span class="phr-loc">${x[1]}</span>${(x[2]&&x[2]!=='—')?` <span class="phr-ph">(${x[2]})</span>`:''}</div>`).join('');
+  return `<div class="prat folded">
+    <div class="prat-h" onclick="this.parentNode.classList.toggle('folded')">🆘 Infos pratiques <span class="prat-off">(hors-ligne)</span><span class="rchev">▾</span></div>
+    <div class="prat-body">
+      <div class="prat-row"><b>🚨 Urgences</b><div>${p.urg}</div></div>
+      <div class="prat-row"><b>🇫🇷 Ambassade / consulat</b><div>${p.amb}</div></div>
+      <div class="prat-row"><b>🔌 Prise &amp; courant</b><div>${p.prise}</div></div>
+      <div class="prat-row"><b>💰 Argent &amp; pourboire</b><div>${p.money}</div></div>
+      <div class="prat-row"><b>🚰 Eau du robinet</b><div>${p.eau}</div></div>
+      <div class="prat-row"><b>⚠️ Bon à savoir</b><div>${p.arn}</div></div>
+      <div class="prat-row"><b>🗣️ Phrases utiles</b><div class="phrs">${phr}</div></div>
+    </div>
+  </div>`;
+}
+function renderItin(){
+  const t=today();let cur=null;for(const st of STAGES){if(t>=pd(st.start)&&t<pd(st.end)){cur=st;break;}}
+  let html=`<div class="sec-title">${STAGES.length} étapes · ${tripDates()} · ${TRAVELERS} pers</div>`;
+  STAGES.forEach(st=>{
+    const tot=stageUnits(st),dsc=stageDone(st),pct=Math.round(dsc/tot*100),now=cur&&cur.id===st.id;
+    html+=`<div class="stage ${now?'open':''}" id="stg-${st.id}">
+      <div class="banner" style="${bannerBg(st)};background-size:cover;background-position:center" onclick="toggleStage('${st.id}')">
+        <div class="ringw">${ring(pct)}</div>
+        <button class="photobtn" onclick="event.stopPropagation();openPhoto('${st.id}')">📷</button>
+        <div class="bov">
+          <span class="fl">${st.fl}</span>
+          <div class="bi"><div class="nm">${st.nm} ${st.tag==='val'?'<span class="tag val">validé</span>':''}${st.tag==='add'?'<span class="tag add">hors sentiers</span>':''}${now?'<span class="tag now">ici</span>':''}</div>
+          <div class="meta">${fmtRange(st)} · ${st.days} j · ${eur(st.budget)}</div></div>
+          <span class="chev">▶</span>
+        </div>
+      </div>
+      <div class="stage-body">
+        <div class="sb-line"><span class="k">Route</span><span>${st.route}</span></div>
+        <div class="sb-line"><span class="k">Visa</span><span>${st.visa}</span></div>
+        ${st.note?`<div class="sb-line"><span class="k">À noter</span><span>${st.note}</span></div>`:''}
+        <div class="film"><b>📸 À filmer :</b> ${st.film}</div>
+        ${pratiqueHtml(st)}
+        ${st.blocks.map(b=>blockHtml(st,b)).join('')}
+      </div></div>`;
+  });
+  $('#v-itin').innerHTML=html;
+}
+function ring(pct){const r=15,c=2*Math.PI*r,off=c-(pct/100)*c;const col=pct>=100?'#8be0a4':'#ffffff';
+  return `<div class="ring"><svg width="40" height="40">
+    <circle cx="20" cy="20" r="${r}" fill="rgba(0,0,0,.25)" stroke="rgba(255,255,255,.35)" stroke-width="3"/>
+    <circle cx="20" cy="20" r="${r}" fill="none" stroke="${col}" stroke-width="3" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${off}"/>
+  </svg><span class="pct">${pct}%</span></div>`;}
+function spotsHtml(st,b){
+  if(!b.spots||!b.spots.length)return '';
+  const ctx=', '+b.c+', '+st.nm;
+  return `<div class="spots"><span class="spots-l">Lieux, tarifs & astuces — toucher le nom pour Google Maps</span>`+
+    b.spots.map(sp=>{
+      const nm=(typeof sp==='string')?sp:sp.n;
+      const star=`<span class="wish ${isWished(nm)?'on':''}" onclick="event.stopPropagation();toggleWishItin('${esc(nm)}',this)">${isWished(nm)?'★':'☆'}</span>`;
+      const link=`<a class="spot" target="_blank" rel="noopener" onclick="event.stopPropagation()" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(nm+ctx)}">${nm}</a>`;
+      const p=(sp&&sp.p)?`<span class="spot-p">${sp.p}</span>`:'';
+      const t=(sp&&sp.t)?`<div class="spot-t">💡 ${sp.t}</div>`:'';
+      return `<div class="spot-row">${star}${link}${p}${t}</div>`;
+    }).join('')+`</div>`;
+}
+function findSpot(b,name){if(b.spots){for(const s of b.spots){if((typeof s==='string'?s:s.n)===name)return s;}}return {n:name};}
+function fichesHtml(st,b,names){
+  if(!names||!names.length)return '';
+  const ctx=', '+b.c+', '+st.nm;
+  return `<div class="spots">`+names.map(nm=>{
+    const sp=findSpot(b,nm);
+    const label=(typeof sp==='string')?sp:sp.n;
+    const star=`<span class="wish ${isWished(label)?'on':''}" onclick="event.stopPropagation();toggleWishItin('${esc(label)}',this)">${isWished(label)?'★':'☆'}</span>`;
+    const link=`<a class="spot" target="_blank" rel="noopener" onclick="event.stopPropagation()" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(label+ctx)}">${label}</a>`;
+    const p=(sp&&sp.p)?`<span class="spot-p">${sp.p}</span>`:'';
+    const t=(sp&&sp.t)?`<div class="spot-t">💡 ${sp.t}</div>`:'';
+    return `<div class="spot-row">${star}${link}${p}${t}</div>`;
+  }).join('')+`</div>`;
+}
+function restoHtml(st,b){
+  if(!b.resto||!b.resto.length)return '';
+  const ctx=', '+b.c+', '+st.nm;
+  const rows=b.resto.map(r=>{
+      const nm=r.n;
+      const star=`<span class="wish ${isWished(nm)?'on':''}" onclick="event.stopPropagation();toggleWishItin('${esc(nm)}',this)">${isWished(nm)?'★':'☆'}</span>`;
+      const link=`<a class="spot" target="_blank" rel="noopener" onclick="event.stopPropagation()" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(nm+ctx)}">${nm}</a>`;
+      const p=r.p?`<span class="spot-p">${r.p}</span>`:'';
+      const t=r.t?`<div class="spot-t">🍽️ ${r.t}</div>`:'';
+      return `<div class="spot-row">${star}${link}${p}${t}</div>`;
+    }).join('');
+  return `<div class="spots resto folded"><span class="spots-l resto-toggle" onclick="event.stopPropagation();this.parentNode.classList.toggle('folded')">🍜 Où manger <span class="rcount">${b.resto.length}</span> <span class="rchev">▾</span></span><div class="resto-list">${rows}</div></div>`;
+}
+let SOCIAL={};
+function socialHtml(st,b){
+  const s=(typeof SOCIAL!=='undefined'&&SOCIAL[b.c])||b.social; if(!s)return '';
+  const ph=(s.ph||[]).map(x=>`<div class="so-item">📸 ${x}</div>`).join('');
+  const f=s.f?`<div class="so-item">💡 ${s.f}</div>`:'';
+  const cap=(s.cap||[]).map(x=>`<div class="so-cap">✍️ « ${x} »</div>`).join('');
+  return `<div class="spots social folded"><span class="spots-l resto-toggle" onclick="event.stopPropagation();this.parentNode.classList.toggle('folded')">📱 Pour Insta &amp; TikTok <span class="rchev">▾</span></span><div class="resto-list so-list">${ph}${f}${cap}</div></div>`;
+}
+function blockHtml(st,b){
+  const bid=st.id+'-'+b.c;
+  const mapl=b.co?`<a class="mapl" href="https://www.google.com/maps/search/?api=1&query=${b.co[0]},${b.co[1]}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Ouvrir dans Google Maps">📍</a>`:'';
+  if(b.days){
+    const all=b.days.every(d=>S.days[st.id+'-'+d.n]);
+    return `<div class="block" id="blk-${cssId(bid)}">
+      <div class="block-h ${all?'done':''}">
+        <div class="cb ${all?'on':''}" onclick="toggleBlockDays('${st.id}','${esc(b.c)}',event)"></div>
+        <div class="bt" onclick="toggleDays('${cssId(bid)}')"><div class="c">${b.c}</div><div class="dd">${b.dd}</div></div>
+        ${mapl}<div class="exp" onclick="toggleDays('${cssId(bid)}')">▾</div></div>
+      <div class="days">${b.days.map(d=>{const done=S.days[st.id+'-'+d.n];return`
+        <div class="day ${done?'done':''}"><div class="cb ${done?'on':''}" onclick="toggleDay('${st.id}',${d.n})"></div>
+          <span class="num">J${d.n}</span><div class="dtx"><span class="dc">${d.dt}</span> — ${d.t}${fichesHtml(st,b,d.sp)}</div></div>`;}).join('')}</div>${restoHtml(st,b)}${socialHtml(st,b)}</div>`;
+  }
+  const done=S.blocks[bid];
+  return `<div class="block"><div class="block-h ${done?'done':''}">
+    <div class="cb ${done?'on':''}" onclick="toggleSimpleBlock('${st.id}','${esc(b.c)}')"></div>
+    <div class="bt"><div class="c">${b.c} <span style="color:var(--muted);font-weight:400;font-size:12px">· ${b.dd}</span></div>
+    <div class="dd" style="margin-top:3px">${b.sum}</div></div>${mapl}</div>${spotsHtml(st,b)}${restoHtml(st,b)}${socialHtml(st,b)}</div>`;
+}
+function toggleStage(id){$('#stg-'+id).classList.toggle('open');}
+function toggleDays(cid){$('#blk-'+cid).classList.toggle('open');}
+function toggleDay(sid,n){S.days[sid+'-'+n]=!S.days[sid+'-'+n];save();renderItin();$('#stg-'+sid).classList.add('open');}
+function toggleBlockDays(sid,c,ev){ev.stopPropagation();const st=STAGES.find(s=>s.id===sid),b=st.blocks.find(x=>x.c===c);
+  const all=b.days.every(d=>S.days[sid+'-'+d.n]);b.days.forEach(d=>S.days[sid+'-'+d.n]=!all);save();renderItin();$('#stg-'+sid).classList.add('open');}
+function toggleSimpleBlock(sid,c){S.blocks[sid+'-'+c]=!S.blocks[sid+'-'+c];save();renderItin();$('#stg-'+sid).classList.add('open');}
+
+/* photo perso par pays */
+function openPhoto(sid){
+  const st=STAGES.find(s=>s.id===sid),cur=S.photos[sid]||'';
+  $('#modal').innerHTML=`<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="sheet">
+    <div class="grabber"></div><h3>📷 Photo — ${st.fl} ${st.nm}</h3>
+    <p style="color:var(--ink2);font-size:13px;margin:0 2px 4px">Colle le lien (URL) d'une de tes photos pour l'utiliser en bandeau de cette étape. Laisse vide pour revenir au visuel par défaut.</p>
+    <label class="fl-l">Lien de l'image (https://…)</label>
+    <input id="ph-url" type="url" inputmode="url" placeholder="https://…" value="${cur}">
+    <button class="btn" onclick="savePhoto('${sid}')">Enregistrer la photo</button>
+    <button class="btn ghost" onclick="clearPhoto('${sid}')">Remettre le visuel par défaut</button>
+    <button class="btn ghost" onclick="closeModal()">Annuler</button></div></div>`;
+}
+function savePhoto(sid){const u=$('#ph-url').value.trim();if(u)S.photos[sid]=u;else delete S.photos[sid];save();closeModal();renderItin();renderToday();toast('✓ Photo mise à jour');}
+function clearPhoto(sid){delete S.photos[sid];save();closeModal();renderItin();renderToday();toast('Visuel par défaut rétabli');}
+
+/* ============ BUDGET ============ */
+/* ===== devises & partage (Tricount) ===== */
+const PAYERS=[{id:"marie",nm:"Marie",em:"👩"},{id:"baptiste",nm:"Baptiste",em:"👨"}];
+function rateOf(cur){const r=(S.rates&&S.rates[cur]!=null)?S.rates[cur]:DEFAULT_RATES[cur];return (r!=null)?r:1;}
+function toEur(e){return (parseFloat(e.amt)||0)*rateOf(e.cur||'EUR');}
+function fmtCur(amt,cur){cur=cur||'EUR';const c=CURRENCIES.find(x=>x.c===cur),sym=c?c.s:cur,n=Math.round(amt).toLocaleString('fr-FR');return cur==='EUR'?(n+' €'):(n+' '+sym);}
+function payerName(id){const p=PAYERS.find(x=>x.id===id);return p?p.nm:'';}
+function meAsPayer(){const em=(SYNC.user&&SYNC.user.email)||'';return em.indexOf('baptiste')>=0?'baptiste':'marie';}
+function updateEurPreview(){const s=$('#e-cur'),a=$('#e-amt'),o=$('#e-eur');if(!s||!o)return;const cur=s.value,amt=parseFloat(a.value)||0;
+  o.textContent=(amt&&cur!=='EUR')?('≈ '+eur(amt*rateOf(cur))+'   (1 '+cur+' = '+rateOf(cur)+' €)'):'';}
+function openRates(){
+  const rates=Object.assign({},DEFAULT_RATES,S.rates||{});
+  const maj=S._ratesAt?('Cours mis à jour le '+new Date(S._ratesAt).toLocaleString('fr-FR')):'Cours par défaut (pas encore actualisés)';
+  $('#modal').innerHTML=`<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="sheet">
+    <div class="grabber"></div><h3>💱 Taux de change (vers €)</h3>
+    <div class="info">🔄 Les taux se mettent à jour <b>automatiquement</b> (cours du jour) dès que tu ouvres l'appli connectée.<br><span style="font-size:11px;color:var(--muted)">${maj}</span></div>
+    <button class="btn ghost" onclick="fetchRates(true)">🔄 Actualiser maintenant</button>
+    <p style="color:var(--ink2);font-size:12.5px;margin:12px 2px 4px">Tu peux aussi <b>ajuster à la main</b> (valeur d'1 unité en €). Une valeur manuelle tient jusqu'à la prochaine actualisation auto.</p>
+    ${CURRENCIES.filter(c=>c.c!=='EUR').map(c=>`<label class="fl-l">${c.s} 1 ${c.c} — ${c.nm}</label><input id="rate-${c.c}" type="number" inputmode="decimal" step="0.000001" value="${rates[c.c]}">`).join('')}
+    <button class="btn" onclick="saveRates()">Enregistrer mes taux</button>
+    <button class="btn ghost" onclick="closeModal()">Fermer</button></div></div>`;
+}
+function saveRates(){S.rates=S.rates||{};CURRENCIES.forEach(c=>{if(c.c==='EUR')return;const el=$('#rate-'+c.c);if(!el)return;const v=parseFloat(el.value);if(v>0)S.rates[c.c]=v;});
+  save();closeModal();renderBudget();renderToday();toast('✓ Taux mis à jour');}
+function fetchRates(force){
+  if(!force && S._ratesAt && (Date.now()-S._ratesAt)<6*3600e3)return;
+  fetch('https://open.er-api.com/v6/latest/EUR').then(r=>r.json()).then(d=>{
+    if(!d||d.result!=='success'||!d.rates)return;
+    S.rates=S.rates||{};let changed=false;
+    CURRENCIES.forEach(c=>{if(c.c==='EUR')return;const v=d.rates[c.c];if(!v||v<=0)return;const eurPer=Math.round((1/v)*1e6)/1e6;
+      if(!S.rates[c.c]||Math.abs(S.rates[c.c]-eurPer)/eurPer>0.003){S.rates[c.c]=eurPer;changed=true;}});
+    S._ratesAt=Date.now();
+    if(changed){save();}else{try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
+    if($('#modal')&&$('#modal').innerHTML.indexOf('Taux de change')>=0){openRates();if(force)toast('✓ Taux actualisés');}
+    if(!$('#v-budget').classList.contains('hidden'))renderBudget();
+  }).catch(()=>{if(force)toast('Actualisation impossible (hors-ligne ?)');});
+}
+function renderBudget(){
+  const spent=S.expenses.reduce((a,e)=>a+toEur(e),0),prevu=BUDGET_PREVU.reduce((a,b)=>a+b.v,0);
+  let html=`<div class="lhero bud-hero"><span class="badge">Dépenses réelles · total en €</span>
+    <div class="bud-tot">${eur(spent)}</div>
+    <div class="pmeta" style="margin-top:6px">sur ${eur(prevu)} prévus · reste ${eur(prevu-spent)}</div>
+    <div class="pbar"><i style="width:${Math.min(100,spent/prevu*100)}%"></i></div>
+    <div class="pmeta"><span>${Math.round(spent/prevu*100)}% du budget</span><span>${eur(spent/TRAVELERS)}/pers</span></div></div>`;
+  html+=`<div style="text-align:center;margin:-4px 0 12px"><button class="chip" onclick="openRates()">💱 Taux de change</button></div>`;
+  const byM=S.expenses.filter(e=>(e.by||'marie')==='marie').reduce((a,e)=>a+toEur(e),0);
+  const byB=S.expenses.filter(e=>e.by==='baptiste').reduce((a,e)=>a+toEur(e),0);
+  const setl=S.settlements||[];
+  const sumB2M=setl.filter(x=>x.from==='baptiste').reduce((a,x)=>a+toEur(x),0);
+  const sumM2B=setl.filter(x=>x.from==='marie').reduce((a,x)=>a+toEur(x),0);
+  const owe=(byM-byB)/2-sumB2M+sumM2B; // >0 : Baptiste doit encore à Marie
+  const settle=Math.abs(owe)<0.5?"Vous êtes à égalité 👍":(owe>0
+    ?`<b>Baptiste</b> doit <b style="color:var(--acc-d)">${eur(owe)}</b> à <b>Marie</b>`
+    :`<b>Marie</b> doit <b style="color:var(--acc-d)">${eur(-owe)}</b> à <b>Baptiste</b>`);
+  html+=`<div class="sec-title">Qui a payé · remboursement</div><div class="card">
+    <div class="cat-line" style="border-top:none"><span class="fl">👩</span><span class="nm">Marie a payé</span><span class="amt"><span class="r">${eur(byM)}</span></span></div>
+    <div class="cat-line"><span class="fl">👨</span><span class="nm">Baptiste a payé</span><span class="amt"><span class="r">${eur(byB)}</span></span></div>
+    ${setl.slice().sort((a,b)=>b.id-a.id).map(x=>`<div class="cat-line"><span class="fl">🔁</span><span class="nm" style="font-weight:400;font-size:13px">${payerName(x.from)} → ${payerName(x.from==='marie'?'baptiste':'marie')} (remboursement)${x.label?'<br><span style="color:var(--muted);font-size:11px">'+x.label+'</span>':''}</span><span class="amt"><span class="r">${eur(toEur(x))}</span></span><button class="del" onclick="delSettle(${x.id})">✕</button></div>`).join('')}
+    <div class="info" style="margin:10px 0 0"><span style="font-size:16px">🤝</span> ${settle}<div style="font-size:11px;color:var(--muted);margin-top:3px">Dépenses « pour 2 » partagées à parts égales, remboursements déduits.</div></div>
+    <button class="btn ghost" style="margin-top:10px" onclick="openSettle()">🔁 Enregistrer un remboursement</button>
+  </div>`;
+  html+=`<div class="sec-title">Par pays — réel vs prévu</div><div class="card">`;
+  BUDGET_PREVU.forEach(b=>{const r=S.expenses.filter(e=>e.country===b.id).reduce((a,e)=>a+toEur(e),0),p=Math.min(100,r/b.v*100),over=r>b.v;
+    html+=`<div class="cat-line" style="flex-wrap:wrap"><span class="fl">${b.fl}</span><span class="nm">${b.nm}</span>
+      <span class="amt"><span class="r" style="color:${over?'var(--red)':'var(--ink)'}">${eur(r)}</span> <span class="p">/ ${eur(b.v)}</span></span>
+      <div class="tinybar" style="flex-basis:100%"><i style="width:${p}%;background:${over?'var(--red)':'linear-gradient(90deg,var(--acc),var(--gold))'}"></i></div></div>`;});
+  html+=`</div><div class="sec-title">Par catégorie</div><div class="card">`;
+  CATS.forEach(c=>{const r=S.expenses.filter(e=>e.cat===c.id).reduce((a,e)=>a+toEur(e),0);
+    html+=`<div class="cat-line"><span class="fl">${c.fl}</span><span class="nm">${c.nm}</span><span class="amt"><span class="r">${eur(r)}</span></span></div>`;});
+  html+=`</div><div class="sec-title">Dernières dépenses</div><div class="card">`;
+  if(!S.expenses.length)html+=`<div class="empty">Aucune dépense.<br>Appuie sur <b>+</b> en bas à droite pour en ajouter.</div>`;
+  else [...S.expenses].sort((a,b)=>b.id-a.id).forEach(e=>{const c=CATS.find(x=>x.id===e.cat)||{fl:'💸'},co=BUDGET_PREVU.find(x=>x.id===e.country)||{fl:'🌏',nm:''};
+    const orig=(e.cur&&e.cur!=='EUR');
+    html+=`<div class="exp-item"><span class="em">${c.fl}</span><div class="ei"><div class="t">${e.label||c.nm}</div>
+      <div class="s">${co.fl} ${co.nm} · ${e.date||''} · payé par ${payerName(e.by||'marie')}</div></div>
+      <span class="ea" style="text-align:right">${orig?`${fmtCur(e.amt,e.cur)}<div style="font-size:10px;color:var(--muted);font-weight:600">≈ ${eur(toEur(e))}</div>`:eur(toEur(e))}</span>
+      ${e.receipt?`<button class="del" style="color:var(--acc-d)" onclick="viewReceipt(${e.id})" title="Voir le reçu">🧾</button>`:''}
+      <button class="del" onclick="delExpense(${e.id})">✕</button></div>`;});
+  html+=`</div>`;
+  $('#v-budget').innerHTML=html;
+}
+function delExpense(id){S.expenses=S.expenses.filter(e=>e.id!==id);save();renderBudget();renderToday();}
+let settleSel={from:'baptiste'};
+function openSettle(){
+  settleSel={from:(meAsPayer()==='marie'?'baptiste':'marie')};
+  const d=new Date().toISOString().slice(0,10);
+  $('#modal').innerHTML=`<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="sheet">
+    <div class="grabber"></div><h3>🔁 Remboursement</h3>
+    <p style="color:var(--ink2);font-size:13px;margin:0 2px 8px">Quand l'un rembourse l'autre (ex. sa part du vol), enregistre-le ici pour rééquilibrer les comptes. Ce n'est pas une dépense partagée, juste un transfert entre vous.</p>
+    <label class="fl-l">Qui rembourse (donne l'argent) ?</label>
+    <div class="chips" id="s-from">${PAYERS.map(p=>`<button class="chip ${p.id===settleSel.from?'on':''}" data-c="${p.id}" onclick="pickFrom('${p.id}')">${p.em} ${p.nm}</button>`).join('')}</div>
+    <label class="fl-l">Devise</label>
+    <select id="s-cur">${CURRENCIES.map(c=>`<option value="${c.c}" ${c.c==='EUR'?'selected':''}>${c.s} ${c.c} — ${c.nm}</option>`).join('')}</select>
+    <label class="fl-l">Montant</label><input id="s-amt" type="number" inputmode="decimal" placeholder="0" step="0.01">
+    <label class="fl-l">Note (optionnel)</label><input id="s-label" placeholder="Ex : sa part du dîner">
+    <label class="fl-l">Date</label><input id="s-date" type="date" value="${d}">
+    <button class="btn" onclick="addSettle()">Enregistrer le remboursement</button><button class="btn ghost" onclick="closeModal()">Annuler</button></div></div>`;
+}
+function pickFrom(id){settleSel.from=id;document.querySelectorAll('#s-from .chip').forEach(c=>c.classList.toggle('on',c.dataset.c===id));}
+function addSettle(){const amt=parseFloat($('#s-amt').value);if(!amt||amt<=0){toast('Entre un montant valide');return;}
+  S.settlements=S.settlements||[];
+  S.settlements.push({id:Date.now(),from:settleSel.from,amt,cur:($('#s-cur')?$('#s-cur').value:'EUR'),label:$('#s-label').value.trim(),date:$('#s-date').value});
+  save();closeModal();renderBudget();toast('✓ Remboursement enregistré');}
+function delSettle(id){S.settlements=(S.settlements||[]).filter(x=>x.id!==id);save();renderBudget();}
+
+/* ============ RAPPELS ============ */
+let remTab='ech';
+let PACK=[];
+function renderRem(){
+  const t=today();
+  let html=`<div class="seg"><button class="${remTab==='ech'?'on':''}" onclick="setRemTab('ech')">🔔 Échéances</button>
+    <button class="${remTab==='prep'?'on':''}" onclick="setRemTab('prep')">🧳 Préparatifs</button>
+    <button class="${remTab==='pack'?'on':''}" onclick="setRemTab('pack')">🎒 Bagage</button></div>`;
+  if(remTab==='ech'){
+    html+=`<div class="info">🔔 Les rappels marqués <b>notification programmée</b> t'arrivent en <b>notification push</b> sur ton téléphone, même carnet fermé, et se relancent chaque semaine jusqu'à ce que tu répondes « c'est fait ». Ceux-ci s'affichent aussi ici pour t'en souvenir.</div>`;
+    const rems=[...REMINDERS].sort((a,b)=>pd(a.date)-pd(b.date));
+    html+=`<div class="sec-title">Réservations & démarches datées</div>`;
+    rems.forEach(r=>{const w=remWhen(r,t),done=S.reminders[r.id];
+      html+=`<div class="rem ${done?'done':''}"><span class="barcol" style="background:${done?'var(--sage)':barByWhen(w.cls)}"></span>
+        <div class="cb ${done?'on':''}" onclick="toggleRem('${r.id}')" style="margin-top:1px"></div>
+        <div class="ri"><div class="t">${r.icon} ${r.t}</div><div class="s">${r.s}</div>
+        <span class="when ${w.cls}">${w.label}</span>
+        ${r.push?'<div class="bell">🔔 notification push programmée</div>':'<div class="bell" style="color:var(--muted)">🔕 rappel dans l\'app</div>'}</div></div>`;});
+    // vols
+    html+=`<div class="sec-title" style="margin-top:20px">Mes vols & enregistrement</div>`;
+    html+=`<a class="btn" href="vols.html?v=15" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;margin:0 0 12px">✈️ Mon plan de vols — routes, prix &amp; liens de recherche</a>`;
+    html+=`<div class="info">Ajoute tes vols au fur et à mesure des réservations : je t'afficherai le compte à rebours du check-in. Pour recevoir une <b>vraie notification push d'enregistrement ~48h avant</b>, redis-moi simplement dans le chat « ajoute un rappel check-in » avec la date du vol.</div>`;
+    if(!S.flights.length)html+=`<div class="empty">Aucun vol enregistré.<br>Appuie sur « + Ajouter un vol ».</div>`;
+    else [...S.flights].sort((a,b)=>pd(a.date+'T'+(a.time||'00:00'))-pd(b.date+'T'+(b.time||'00:00'))).forEach(f=>{
+      const dep=new Date(f.date+'T'+(f.time||'00:00')),ci=new Date(dep.getTime()-48*3600e3),now=new Date();
+      let st,cls;const dd=Math.ceil((dep-now)/864e5);
+      if(dep<now){st='✈️ Vol passé';cls='w-done';}
+      else if(now>=ci){st='🟢 Enregistrement ouvert !';cls='w-now';}
+      else{const h=Math.ceil((ci-now)/3600e3);st=h>48?`Check-in ouvre dans ${Math.ceil(h/24)} j`:`Check-in ouvre dans ${h} h`;cls='w-soon';}
+      html+=`<div class="flight"><div class="fr"><div class="rt">✈️ ${f.from} → ${f.to}</div>
+        <div class="dt">${pd(f.date).toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short',year:'numeric'})}${f.time?' · '+f.time:''}${f.conf?' · '+f.conf:''}</div>
+        <span class="ci ${cls}">${st}</span></div><button class="del" onclick="delFlight(${f.id})">✕</button></div>`;});
+    html+=`<button class="btn ghost" style="margin-top:6px" onclick="openFlight()">＋ Ajouter un vol</button>`;
+  } else if(remTab==='prep'){
+    const all=CHECK.reduce((a,g)=>a+g.items.length,0),done=CHECK.reduce((a,g)=>a+g.items.filter(i=>S.check[i.id]).length,0);
+    html+=`<div class="lhero"><span class="badge">Préparation</span><div class="big">${done}<small> / ${all} démarches</small></div>
+      <div class="pbar"><i style="width:${Math.round(done/all*100)}%"></i></div>
+      <div class="pmeta"><span>${Math.round(done/all*100)}% prêt</span><span>${all-done} restantes</span></div></div>`;
+    CHECK.forEach(g=>{html+=`<div class="ck-when">▹ ${g.when}</div>`;
+      g.items.forEach(i=>{const d=S.check[i.id];
+        html+=`<div class="ck-item ${d?'done':''}" onclick="toggleCheck('${i.id}')"><div class="cb big ${d?'on':''}"></div>
+          <div class="ci"><div class="t">${i.t}</div>${i.s?`<div class="s">${i.s}</div>`:''}</div></div>`;});});
+  } else {
+    const pall=PACK.reduce((a,g)=>a+g.items.length,0),pdone=PACK.reduce((a,g)=>a+g.items.filter(i=>S.check[i.id]).length,0);
+    html+=`<div class="lhero"><span class="badge">Bagage</span><div class="big">${pdone}<small> / ${pall} affaires</small></div>
+      <div class="pbar"><i style="width:${pall?Math.round(pdone/pall*100):0}%"></i></div>
+      <div class="pmeta"><span>${pall?Math.round(pdone/pall*100):0}% dans le sac</span><span>${pall-pdone} restantes</span></div></div>`;
+    html+=`<div class="info">🎒 Liste pour 2 (👩 Marie + 👨 Baptiste) — coche au fur et à mesure. Pense aux couches (chaud/froid) et à l'imperméable selon les étapes.</div>`;
+    PACK.forEach(g=>{html+=`<div class="ck-when">▹ ${g.cat}</div>`;
+      g.items.forEach(i=>{const d=S.check[i.id];
+        html+=`<div class="ck-item ${d?'done':''}" onclick="toggleCheck('${i.id}')"><div class="cb big ${d?'on':''}"></div>
+          <div class="ci"><div class="t">${i.t}</div>${i.s?`<div class="s">${i.s}</div>`:''}</div></div>`;});});
+  }
+  $('#v-rem').innerHTML=html;
+}
+function barByWhen(c){return c==='w-now'||c==='w-late'?'var(--red)':c==='w-soon'?'var(--acc)':c==='w-done'?'var(--sage)':'var(--line2)';}
+function setRemTab(t){remTab=t;renderRem();window.scrollTo(0,0);}
+function toggleRem(id){S.reminders[id]=!S.reminders[id];save();renderRem();renderToday();}
+function toggleCheck(id){S.check[id]=!S.check[id];save();renderRem();}
+function delFlight(id){S.flights=S.flights.filter(f=>f.id!==id);save();renderRem();}
+function openFlight(){
+  $('#modal').innerHTML=`<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="sheet">
+    <div class="grabber"></div><h3>✈️ Ajouter un vol</h3>
+    <div class="row2"><div><label class="fl-l">De</label><input id="f-from" placeholder="Ex : ville de départ"></div>
+    <div><label class="fl-l">Vers</label><input id="f-to" placeholder="Ex : ville d'arrivée"></div></div>
+    <div class="row2"><div><label class="fl-l">Date</label><input id="f-date" type="date"></div>
+    <div><label class="fl-l">Heure</label><input id="f-time" type="time"></div></div>
+    <label class="fl-l">N° de réservation (optionnel)</label><input id="f-conf" placeholder="Ex : ABC123">
+    <button class="btn" onclick="addFlight()">Ajouter le vol</button>
+    <button class="btn ghost" onclick="closeModal()">Annuler</button></div></div>`;
+}
+function addFlight(){const from=$('#f-from').value.trim(),to=$('#f-to').value.trim(),date=$('#f-date').value;
+  if(!from||!to||!date){toast('Renseigne au moins départ, arrivée et date');return;}
+  S.flights.push({id:Date.now(),from,to,date,time:$('#f-time').value,conf:$('#f-conf').value.trim()});
+  save();closeModal();renderRem();toast('✓ Vol ajouté');}
+
+/* notifications locales (quand le carnet est ouvert) */
+let notifAsked=false;const notifShown=new Set();
+function askNotif(){if(notifAsked)return;notifAsked=true;
+  try{if('Notification'in window&&Notification.permission==='default'){Notification.requestPermission().then(checkDue);}else checkDue();}catch(e){}}
+function checkDue(){try{if(!('Notification'in window)||Notification.permission!=='granted')return;const t=today();
+  REMINDERS.forEach(r=>{if(!S.reminders[r.id]&&pd(r.date)<=t&&!notifShown.has(r.id)){notifShown.add(r.id);
+    new Notification('Rappel — '+r.t,{body:r.s});}});
+  S.flights.forEach(f=>{const dep=new Date(f.date+'T'+(f.time||'00:00')),ci=new Date(dep.getTime()-48*3600e3),k='f'+f.id;
+    if(new Date()>=ci&&new Date()<dep&&!notifShown.has(k)){notifShown.add(k);new Notification('Enregistrement ouvert ✈️',{body:f.from+' → '+f.to});}});
+  }catch(e){}}
+
+/* ============ CARTE ============ */
+let map;
+let CFLAG={};
+let SPOT_CO={};
+let RESTO_CO={};
+let spotMarkers={},spotsLayer=null;
+function isWished(n){return !!(S.wishlist&&S.wishlist[n]);}
+function spotEmoji(n){const s=(n||'').toLowerCase();
+  if(/wat |temple|pagode|pagoda|sanctuaire|monast|shrine|inari|-ji|tōdai|todai|torii|stupa|that luang|angkor|bayon|prohm|banteay|xieng thong|songzanlin|kushida|itsukushima|senso/.test(s))return '🛕';
+  if(/château|citadelle|palais|palace|fort|remparts|forbidden|cité interdite|castle|kumamoto|crazy house/.test(s))return '🏯';
+  if(/musée|museum|mémorial|memorial|cope|tuol sleng|genbaku|vestiges|bombe|choeung/.test(s))return '🏛️';
+  if(/plage|beach|lagoon|bay|baie|saracen|klong|railay|ao nang|kradan|ngai|farmer|sivalai|long beach|an bang|klong dao/.test(s))return '🏖️';
+  if(/koh |île|island|rong samloem|lapins|yao noi|coron|palawan/.test(s))return '🏝️';
+  if(/cascade|waterfall|chutes|falls|kuang si|datanla|bou sra|bua thong|sticky/.test(s))return '💧';
+  if(/grotte|cave|tham|morakot|paradise cave|dark cave|pak ou|pha tok|chiang dao/.test(s))return '🕳️';
+  if(/mont |montagne|mountain|peak|doi |col |fansipan|phousi|misen|mont aso|tapyas|nam xay|pha daeng|tianmen|tianzi|inthanon|zhangjiajie|avatar/.test(s))return '⛰️';
+  if(/lac |lake|étang|xuan huong|barracuda|kayangan|twin lagoon|napa|houhai/.test(s))return '🏞️';
+  if(/rizière|rice|parc|park|jardin|pudacuo|cat cat|muong hoa/.test(s))return '🌳';
+  if(/marché|market|bazaar|night|talat|ben thanh|dong ba|russe|houhai|nakasu|yatai/.test(s))return '🛍️';
+  if(/épave|wreck|plongée|maru|okikawa|irako/.test(s))return '🤿';
+  if(/pont|bridge|megane|su tong/.test(s))return '🌉';
+  if(/croisière|bateau|mékong|nam song|nam ou|pak beng|huay xai|embarcadère|muang ngoi/.test(s))return '🛶';
+  if(/muraille|great wall|jinshanling/.test(s))return '🧱';
+  if(/terre cuite|guerrier/.test(s))return '🗿';
+  return '📍';}
+function spotIcon(col,on,n,resto){const em=resto?'🍜':spotEmoji(n);const sz=on?26:22;const bd=on?'#e8b64a':(resto?'#c98a5b':col);
+  return L.divIcon({className:'',iconSize:[sz,sz],iconAnchor:[sz/2,sz/2],
+    html:`<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:${on?'#fff3d6':'rgba(255,255,255,.94)'};border:2px solid ${bd};box-shadow:0 1px 3px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;font-size:${on?15:13}px">${em}</div>`});}
+function spotPopup(st,b,sp,resto){const on=isWished(sp.n);
+  return `<div class="pop" style="max-width:230px"><b>${resto?'🍜 ':''}${sp.n}</b>${on?' ⭐':''}
+    ${sp.p?`<div class="pm">💰 ${sp.p}</div>`:''}
+    ${sp.t?`<div style="font-size:12px;color:#555;margin-top:3px">${resto?'🍽️':'💡'} ${sp.t}</div>`:''}
+    <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(sp.n+', '+b.c+', '+st.nm)}" target="_blank" rel="noopener" style="font-size:12px;display:inline-block;margin-top:5px">Ouvrir dans Google Maps ↗</a><br>
+    <a href="#" onclick="toggleWishMap('${esc(sp.n)}');return false;" style="font-size:12.5px;font-weight:700;display:inline-block;margin-top:5px;color:${on?'#b0402c':'var(--gold-d)'}">${on?(resto?'✔ Retirer de « à tester »':'✔ Retirer de « à voir »'):(resto?'🍜 Ajouter à « à tester »':'⭐ Ajouter à « à voir »')}</a></div>`;}
+function refreshSpotMarker(n,reopen){const r=spotMarkers[n];if(!r)return;r.marker.setIcon(spotIcon(r.col,isWished(n),n,r.resto));r.marker.setPopupContent(spotPopup(r.st,r.b,r.sp,r.resto));if(reopen)r.marker.openPopup();}
+function toggleWishMap(n){S.wishlist=S.wishlist||{};if(S.wishlist[n])delete S.wishlist[n];else S.wishlist[n]=true;save();refreshSpotMarker(n,true);buildMapCtrl();if(mapWishOnly)applySpotFilter();toast(S.wishlist[n]?'⭐ Ajouté à « à voir »':'Retiré de « à voir »');}
+function toggleWishItin(n,el){S.wishlist=S.wishlist||{};if(S.wishlist[n])delete S.wishlist[n];else S.wishlist[n]=true;save();
+  if(el){el.textContent=S.wishlist[n]?'★':'☆';el.classList.toggle('on',!!S.wishlist[n]);}
+  if(mapInited){if(spotMarkers[n])refreshSpotMarker(n,false);buildMapCtrl();if(mapWishOnly)applySpotFilter();}}
+let mapWishOnly=false;
+function updateSpotsVis(){if(!map||!spotsLayer)return;if(mapWishOnly){if(!map.hasLayer(spotsLayer))map.addLayer(spotsLayer);return;}const z=map.getZoom();if(z>=6){if(!map.hasLayer(spotsLayer))map.addLayer(spotsLayer);}else{if(map.hasLayer(spotsLayer))map.removeLayer(spotsLayer);}}
+function applySpotFilter(){if(!spotsLayer)return;spotsLayer.clearLayers();Object.keys(spotMarkers).forEach(n=>{if(mapWishOnly&&!isWished(n))return;spotsLayer.addLayer(spotMarkers[n].marker);});updateSpotsVis();}
+function toggleWishFilter(){mapWishOnly=!mapWishOnly;applySpotFilter();buildMapCtrl();
+  if(mapWishOnly&&map){const pts=Object.keys(spotMarkers).filter(n=>isWished(n)).map(n=>SPOT_CO[n]).filter(Boolean);if(pts.length)map.fitBounds(L.latLngBounds(pts),{padding:[40,40],maxZoom:12});}}
+function buildMapCtrl(){const el=document.getElementById('mapctrl');if(!el)return;const cnt=Object.keys(S.wishlist||{}).length;
+  el.innerHTML=`<button class="chip" style="box-shadow:0 2px 8px rgba(0,0,0,.28)" onclick="openWishlist()">⭐ À voir (${cnt})</button><button class="chip ${mapWishOnly?'on':''}" style="box-shadow:0 2px 8px rgba(0,0,0,.28)" onclick="toggleWishFilter()">Carte : ${mapWishOnly?'⭐ seulement ✔':'tout'}</button>`;}
+function openWishlist(){
+  const w=S.wishlist||{};const total=Object.keys(w).length;const shown={};let body='';
+  if(!total)body=`<div class="empty">Aucun lieu en « à voir ».<br>Touche l'étoile ☆ sur un lieu (carte ou itinéraire) pour l'ajouter.</div>`;
+  else STAGES.forEach(st=>{const rows=[];st.blocks.forEach(b=>{[].concat(b.spots||[],b.resto||[]).forEach(sp=>{const n=(typeof sp==='string')?sp:sp.n;if(!w[n]||shown[n])return;shown[n]=1;
+    rows.push(`<div class="ck-item" style="margin-bottom:7px"><div class="ci"><div class="t">${n}</div>${(sp&&sp.p)?`<div class="s">💰 ${sp.p}</div>`:''}${(sp&&sp.t)?`<div class="s">💡 ${sp.t}</div>`:''}</div>
+      <a class="mapl" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(n+', '+b.c+', '+st.nm)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">📍</a>
+      <button class="del" style="color:#e8b64a;font-size:16px" onclick="wishRemove('${esc(n)}')">★</button></div>`);});});
+    if(rows.length)body+=`<div class="ck-when">${st.fl} ${st.nm}</div>`+rows.join('');});
+  $('#modal').innerHTML=`<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="sheet">
+    <div class="grabber"></div><h3>⭐ Mes lieux à voir (${total})</h3>${body}
+    <button class="btn ghost" onclick="closeModal()">Fermer</button></div></div>`;
+}
+function wishRemove(n){if(S.wishlist)delete S.wishlist[n];save();if(mapInited){refreshSpotMarker(n,false);buildMapCtrl();applySpotFilter();}renderItin();openWishlist();}
+function initMap(){
+  if(mapInited)return;
+  if(typeof L==='undefined'){$('#map').innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:24px;color:var(--muted)"><div style="font-size:34px;margin-bottom:10px">🗺️</div><b style="color:var(--ink)">Carte indisponible hors-ligne</b><br><span style="font-size:13px;margin-top:6px">Reconnecte-toi à internet puis rouvre cet onglet.</span></div>';return;}
+  mapInited=true;
+  map=L.map('map',{zoomControl:true,attributionControl:false}).setView([16,105],4);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:18,subdomains:'abcd'}).addTo(map);
+  const t=today();let curStage=null;for(const st of STAGES){if(t>=pd(st.start)&&t<pd(st.end)){curStage=st;break;}}
+  const allPts=[];let idx=0;let prevEnd=null;
+  spotsLayer=L.layerGroup();spotMarkers={};const added={};
+  STAGES.forEach(st=>{
+    const col=CFLAG[st.id];const pts=[];
+    st.blocks.forEach(b=>{
+      if(b.co){idx++;allPts.push(b.co);pts.push(b.co);
+        const cur=curStage&&curStage.id===st.id;const sz=cur?28:22;
+        const icon=L.divIcon({className:'',iconSize:[sz,sz],iconAnchor:[sz/2,sz/2],
+          html:`<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:${col};border:2.5px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.45);color:#fff;font-size:${cur?12:11}px;font-weight:800;display:flex;align-items:center;justify-content:center;${cur?'outline:3px solid '+col+'55;outline-offset:1px;':''}">${idx}</div>`});
+        const pop=`<div class="pop"><b>${idx}. ${st.fl} ${b.c}</b>${cur?' <span style="color:var(--acc-d);font-weight:700">· ici</span>':''}
+          <div class="pm">${st.nm} · ${b.dd||fmtRange(st)}</div>
+          <a href="https://www.google.com/maps/search/?api=1&query=${b.co[0]},${b.co[1]}" target="_blank" rel="noopener" style="font-size:12px;display:inline-block;margin-top:5px">Ouvrir dans Google Maps ↗</a><br>
+          <a href="#" onclick="gotoStage('${st.id}');return false;" style="font-size:12px;display:inline-block;margin-top:3px">Voir l'étape dans l'itinéraire →</a></div>`;
+        L.marker(b.co,{icon,riseOnHover:true}).addTo(map).bindPopup(pop);
+      }
+      if(b.spots)b.spots.forEach(sp=>{const so=(typeof sp==='string')?{n:sp}:sp;const n=so.n;if(added[n])return;const co=SPOT_CO[n];if(!co)return;added[n]=1;
+        const m=L.marker(co,{icon:spotIcon(col,isWished(n),n)}).bindPopup(spotPopup(st,b,so),{maxWidth:250});
+        spotMarkers[n]={marker:m,col,st,b,sp:so,resto:false};spotsLayer.addLayer(m);});
+      if(b.resto&&typeof RESTO_CO!=='undefined')b.resto.forEach(rr=>{const n=rr.n;if(added[n])return;const co=RESTO_CO[n];if(!co)return;added[n]=1;
+        const m=L.marker(co,{icon:spotIcon(col,isWished(n),n,true)}).bindPopup(spotPopup(st,b,rr,true),{maxWidth:250});
+        spotMarkers[n]={marker:m,col,st,b,sp:rr,resto:true};spotsLayer.addLayer(m);});
+    });
+    if(pts.length>1)L.polyline(pts,{color:col,weight:3.5,opacity:.8}).addTo(map);
+    if(prevEnd&&pts.length)L.polyline([prevEnd,pts[0]],{color:'#9a9084',weight:1.6,opacity:.55,dashArray:'2 7'}).addTo(map);
+    if(pts.length)prevEnd=pts[pts.length-1];
+  });
+  let lg='<span style="flex-basis:100%;color:var(--muted);font-size:11px">Chiffres = villes (ordre du voyage) · <b>zoome</b> pour voir les lieux (🛕🏖️…) et restos (🍜) · ⭐ = à voir · pointillés = vols</span>';
+  BUDGET_PREVU.filter(b=>CFLAG[b.id]).forEach(b=>{lg+=`<span><i style="background:${CFLAG[b.id]}"></i>${b.fl} ${b.nm}</span>`;});
+  $('#legend').innerHTML=lg;
+  mapWishOnly=false;buildMapCtrl();
+  map.on('zoomend',updateSpotsVis);
+  if(allPts.length)map.fitBounds(L.latLngBounds(allPts),{padding:[30,30]});
+  updateSpotsVis();
+  setTimeout(()=>{map.invalidateSize();updateSpotsVis();},120);
+}
+function gotoStage(id){nav('itin');const el=$('#stg-'+id);if(el){el.classList.add('open');setTimeout(()=>{el.scrollIntoView({behavior:'smooth',block:'start'});},90);}}
+
+/* ============ DÉPENSE ============ */
+let expSel={cat:'nourr',country:'cn'};
+function openExpense(){
+  const cc=(currentCountry()||'cn');
+  expSel={cat:'nourr',country:cc,cur:(COUNTRY_CUR[cc]||'EUR'),by:meAsPayer(),receipt:null};
+  const d=new Date().toISOString().slice(0,10);
+  $('#modal').innerHTML=`<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="sheet">
+    <div class="grabber"></div><h3>Nouvelle dépense</h3>
+    <label class="fl-l">Devise (tu paies en monnaie locale)</label>
+    <select id="e-cur" onchange="updateEurPreview()">${CURRENCIES.map(c=>`<option value="${c.c}" ${c.c===expSel.cur?'selected':''}>${c.s} ${c.c} — ${c.nm}</option>`).join('')}</select>
+    <label class="fl-l">Montant (dans la devise, pour 2)</label><input id="e-amt" type="number" inputmode="decimal" placeholder="0" step="0.01" oninput="updateEurPreview()">
+    <div id="e-eur" style="font-size:12.5px;color:var(--sage-d);font-weight:700;margin:6px 2px 0"></div>
+    <label class="fl-l">Payé par</label><div class="chips" id="e-by">${PAYERS.map(p=>`<button class="chip ${p.id===expSel.by?'on':''}" data-c="${p.id}" onclick="pickBy('${p.id}')">${p.em} ${p.nm}</button>`).join('')}</div>
+    <label class="fl-l">Description</label><input id="e-label" placeholder="Ex : guesthouse Yangshuo…">
+    <label class="fl-l">Catégorie</label><div class="chips" id="e-cats">${CATS.map(c=>`<button class="chip ${c.id===expSel.cat?'on':''}" data-c="${c.id}" onclick="pickCat('${c.id}')">${c.fl} ${c.nm}</button>`).join('')}</div>
+    <label class="fl-l">Pays / poste</label><div class="chips" id="e-cty">${BUDGET_PREVU.map(b=>`<button class="chip ${b.id===expSel.country?'on':''}" data-c="${b.id}" onclick="pickCty('${b.id}')">${b.fl} ${b.nm.split(' ')[0]}</button>`).join('')}</div>
+    <label class="fl-l">Date</label><input id="e-date" type="date" value="${d}">
+    <label class="fl-l">Reçu (photo, optionnel)</label>
+    <input id="e-recu" type="file" accept="image/*" capture="environment" onchange="handleReceipt(this)">
+    <div id="e-recu-prev" style="margin-top:8px"></div>
+    <button class="btn" onclick="addExpense()">Ajouter</button><button class="btn ghost" onclick="closeModal()">Annuler</button></div></div>`;
+}
+function handleReceipt(input){
+  const f=input.files&&input.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{const img=new Image();img.onload=()=>{
+    const max=900,sc=Math.min(1,max/Math.max(img.width,img.height));
+    const cw=Math.round(img.width*sc),ch=Math.round(img.height*sc);
+    const cv=document.createElement('canvas');cv.width=cw;cv.height=ch;
+    cv.getContext('2d').drawImage(img,0,0,cw,ch);
+    try{expSel.receipt=cv.toDataURL('image/jpeg',0.55);}catch(e){toast('Image non lisible');return;}
+    const pv=$('#e-recu-prev');if(pv)pv.innerHTML=`<img src="${expSel.receipt}" style="max-height:100px;border-radius:10px;border:1px solid var(--line)"> <button class="chip" onclick="clearReceipt()">✕ Retirer</button>`;
+  };img.onerror=()=>toast('Image non lisible');img.src=r.result;};
+  r.readAsDataURL(f);
+}
+function clearReceipt(){expSel.receipt=null;const pv=$('#e-recu-prev');if(pv)pv.innerHTML='';const inp=$('#e-recu');if(inp)inp.value='';}
+function viewReceipt(id){const e=S.expenses.find(x=>x.id===id);if(!e||!e.receipt)return;
+  $('#modal').innerHTML=`<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="sheet" style="text-align:center">
+    <div class="grabber"></div><h3>🧾 Reçu</h3><img src="${e.receipt}" style="max-width:100%;border-radius:12px;border:1px solid var(--line)">
+    <button class="btn ghost" onclick="closeModal()">Fermer</button></div></div>`;
+}
+function currentCountry(){const t=today();for(const st of STAGES){if(t>=pd(st.start)&&t<pd(st.end))return st.id;}return null;}
+function pickCat(id){expSel.cat=id;document.querySelectorAll('#e-cats .chip').forEach(c=>c.classList.toggle('on',c.dataset.c===id));}
+function pickCty(id){expSel.country=id;document.querySelectorAll('#e-cty .chip').forEach(c=>c.classList.toggle('on',c.dataset.c===id));
+  const sel=$('#e-cur');if(sel&&COUNTRY_CUR[id]){sel.value=COUNTRY_CUR[id];updateEurPreview();}}
+function pickBy(id){expSel.by=id;document.querySelectorAll('#e-by .chip').forEach(c=>c.classList.toggle('on',c.dataset.c===id));}
+function addExpense(){const amt=parseFloat($('#e-amt').value);if(!amt||amt<=0){toast('Entre un montant valide');return;}
+  const cur=$('#e-cur')?$('#e-cur').value:'EUR';
+  S.expenses.push({id:Date.now(),amt,cur,by:expSel.by,cat:expSel.cat,country:expSel.country,label:$('#e-label').value.trim(),date:$('#e-date').value,receipt:expSel.receipt||null});
+  save();closeModal();renderBudget();renderToday();toast('✓ Dépense ajoutée');}
+function closeModal(){$('#modal').innerHTML='';}
+
+/* ============ DONNÉES ============ */
+function openData(){
+  const jc=Object.values(S.days).filter(Boolean).length+Object.values(S.blocks).filter(Boolean).length,
+    cc=Object.values(S.check).filter(Boolean).length,rc=Object.values(S.reminders).filter(Boolean).length;
+  $('#modal').innerHTML=`<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="sheet">
+    <div class="grabber"></div><h3>💾 Mes données</h3>
+    <div class="card tight" style="margin-bottom:14px"><div class="mini"><span class="dot"></span><div class="txt">
+      <div class="t">${jc} jours cochés · ${cc} préparatifs · ${rc} rappels faits</div>
+      <div class="d">${S.expenses.length} dépense(s) · ${S.flights.length} vol(s)</div></div></div></div>
+    <p style="color:var(--ink2);font-size:13px;margin:0 2px 4px">Tes données sont enregistrées dans ce navigateur. Exporte une sauvegarde de temps en temps pour ne rien perdre ou la transférer sur un autre appareil.</p>
+    <button class="btn" onclick="exportData()">⬇️ Exporter une sauvegarde (.json)</button>
+    <label class="fl-l">Importer une sauvegarde</label><input id="imp" type="file" accept="application/json" onchange="importData(event)">
+    <button class="btn ghost" onclick="closeModal();openSync()">☁️ Synchroniser à deux (avec Marie)</button>
+    <button class="btn ghost" onclick="closeModal()">Fermer</button>
+    <button class="btn ghost" style="color:var(--red);margin-top:8px" onclick="resetData()">Tout réinitialiser</button></div></div>`;
+}
+function exportData(){const blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download='tour-asie-sauvegarde-'+new Date().toISOString().slice(0,10)+'.json';a.click();toast('✓ Sauvegarde exportée');}
+function importData(ev){const f=ev.target.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{try{const d=JSON.parse(r.result);S={days:d.days||{},blocks:d.blocks||{},check:d.check||{},expenses:d.expenses||[],reminders:d.reminders||{},flights:d.flights||[],photos:d.photos||{},rates:d.rates||{},wishlist:d.wishlist||{},settlements:d.settlements||[]};save();closeModal();renderAll();toast('✓ Sauvegarde importée');}catch(e){toast('⚠️ Fichier invalide');}};r.readAsText(f);}
+function resetData(){if(confirm('Effacer toutes tes données ?')){S={days:{},blocks:{},check:{},expenses:[],reminders:{},flights:[],photos:{},rates:{},wishlist:{},settlements:[]};save();closeModal();renderAll();toast('Données réinitialisées');}}
+
+/* ============ INIT ============ */
+function renderAll(){renderToday();renderItin();renderBudget();renderRem();}
+/* le carnet reste verrouillé (body.locked) et vide tant que la connexion n'est pas validée ;
+   renderAll()+nav() sont déclenchés par initFirebase() une fois l'utilisateur authentifié */
+initPWA();initFirebase();fetchRates();
+</script>
+</body>
+</html>
