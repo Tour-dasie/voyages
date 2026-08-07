@@ -1011,7 +1011,7 @@ function renderRem(){
         ${r.push?'<div class="bell">🔔 notification push programmée</div>':'<div class="bell" style="color:var(--muted)">🔕 rappel dans l\'app</div>'}</div></div>`;});
     // vols
     html+=`<div class="sec-title" style="margin-top:20px">Mes vols & enregistrement</div>`;
-    html+=`<a class="btn" href="vols.html?v=15" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;margin:0 0 12px">✈️ Mon plan de vols — routes, prix &amp; liens de recherche</a>`;
+    html+=`<a class="btn" href="vols.html?v=16" style="display:block;text-align:center;text-decoration:none;margin:0 0 12px">✈️ Mon plan de vols — routes, prix &amp; liens de recherche</a>`;
     html+=`<div class="info">Ajoute tes vols au fur et à mesure des réservations : je t'afficherai le compte à rebours du check-in. Pour recevoir une <b>vraie notification push d'enregistrement ~48h avant</b>, redis-moi simplement dans le chat « ajoute un rappel check-in » avec la date du vol.</div>`;
     if(!S.flights.length)html+=`<div class="empty">Aucun vol enregistré.<br>Appuie sur « + Ajouter un vol ».</div>`;
     else [...S.flights].sort((a,b)=>pd(a.date+'T'+(a.time||'00:00'))-pd(b.date+'T'+(b.time||'00:00'))).forEach(f=>{
