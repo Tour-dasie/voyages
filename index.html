@@ -653,7 +653,7 @@ function stageDone(st){let d=0;st.blocks.forEach(b=>{if(b.days){b.days.forEach(d
 function tripUnits(){return STAGES.reduce((a,s)=>a+stageUnits(s),0);}
 function tripDone(){return STAGES.reduce((a,s)=>a+stageDone(s),0);}
 function fmtRange(st){const o={day:'numeric',month:'short'};return pd(st.start).toLocaleDateString('fr-FR',o)+' → '+pd(st.end).toLocaleDateString('fr-FR',o);}
-function stagePhoto(st){return S.photos[st.id]||(st.photo?IMG(st.photo):null);}
+function stagePhoto(st){return S.photos[st.id]||(st.photo?(/^https?:\/\//.test(st.photo)?st.photo:IMG(st.photo)):null);}
 function bannerBg(st){
   const url=stagePhoto(st),ov="linear-gradient(180deg,rgba(40,32,24,.12),rgba(40,32,24,.62))",
     fb=`linear-gradient(135deg,${st.col},${shade(st.col,-22)})`;
@@ -683,7 +683,9 @@ function renderToday(){
   let html='';
   if(t<start){
     const dl=dbtw(t,start);
-    html+=`<div class="phero"><div class="pc">
+    const ph0=(STAGES.length?stagePhoto(STAGES[0]):null);
+    const bg0=ph0?`style="background-image:linear-gradient(180deg,rgba(40,32,24,.1),rgba(40,32,24,.66)),url('${ph0}');background-size:cover;background-position:center"`:'';
+    html+=`<div class="phero" ${bg0}><div class="pc">
       <span class="badge">Compte à rebours</span>
       <div class="big">J-${dl} <small>avant le départ</small></div>
       <div class="sub">${tripDates()}</div>
@@ -722,7 +724,7 @@ function renderToday(){
 
   // galerie
   html+=`<div class="sec-title">Aperçu du voyage</div>
-  <div class="strip">${GALLERY.map(g=>`<div class="pcard"><img class="im" loading="lazy" src="${IMG(g.id)}" onerror="this.style.display='none'"><div class="cap">${g.c}</div></div>`).join('')}</div>`;
+  <div class="strip">${GALLERY.map(g=>`<div class="pcard"><img class="im" loading="lazy" src="${/^https?:\/\//.test(g.id)?g.id:IMG(g.id)}" onerror="this.style.display='none'"><div class="cap">${g.c}</div></div>`).join('')}</div>`;
 
   // suite du parcours
   html+=`<div class="sec-title">La suite du parcours</div><div class="card">`;
