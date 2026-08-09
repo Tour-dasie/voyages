@@ -1125,9 +1125,7 @@ let mapWishOnly=false;
 let mapCat="";
 const CATLBL={"\u{1F6CF}\u{FE0F}":"Où dormir","\u{1F9D7}":"Via ferrata","\u{26F0}\u{FE0F}":"Montagnes & cols","\u{1F3DE}\u{FE0F}":"Lacs","\u{1F4A7}":"Cascades & gorges","\u{1F3EF}":"Châteaux & cités","\u{1F333}":"Parcs & vallées","\u{1F6CD}\u{FE0F}":"Villages & marchés","\u{1F309}":"Ponts","\u{1F3DB}\u{FE0F}":"Musées","\u{1F573}\u{FE0F}":"Grottes","\u{1F6D5}":"Sanctuaires","\u{1F3D6}\u{FE0F}":"Plages","\u{1F3DD}\u{FE0F}":"Îles","\u{1F93F}":"Plongée","\u{1F6F6}":"Bateau","\u{1F9F1}":"Muraille","\u{1F5FF}":"Monuments","\u{1F35C}":"Restaurants","\u{1F4CD}":"Autres"};
 function spotCat(n){const r=spotMarkers[n];return (r&&r.resto)?"\u{1F35C}":spotEmoji(n);}
-function setMapCat(v){mapCat=v;applySpotFilter();buildMapCtrl();
-  if(mapCat&&map){const pts=Object.keys(spotMarkers).filter(n=>spotCat(n)===mapCat).map(n=>spotMarkers[n].marker.getLatLng());
-    if(pts.length)map.fitBounds(L.latLngBounds(pts),{padding:[40,40],maxZoom:11});}}
+function setMapCat(v){mapCat=v;applySpotFilter();buildMapCtrl();}
 function updateSpotsVis(){if(!map||!spotsLayer)return;if(mapWishOnly){if(!map.hasLayer(spotsLayer))map.addLayer(spotsLayer);return;}const z=map.getZoom();if(z>=6){if(!map.hasLayer(spotsLayer))map.addLayer(spotsLayer);}else{if(map.hasLayer(spotsLayer))map.removeLayer(spotsLayer);}}
 function applySpotFilter(){if(!spotsLayer)return;spotsLayer.clearLayers();Object.keys(spotMarkers).forEach(n=>{if(mapWishOnly&&!isWished(n))return;if(mapCat&&spotCat(n)!==mapCat)return;spotsLayer.addLayer(spotMarkers[n].marker);});updateSpotsVis();}
 function toggleWishFilter(){mapWishOnly=!mapWishOnly;applySpotFilter();buildMapCtrl();
