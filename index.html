@@ -1122,12 +1122,26 @@ function toggleWishItin(n,el){S.wishlist=S.wishlist||{};if(S.wishlist[n])delete 
   if(el){el.textContent=S.wishlist[n]?'★':'☆';el.classList.toggle('on',!!S.wishlist[n]);}
   if(mapInited){if(spotMarkers[n])refreshSpotMarker(n,false);buildMapCtrl();if(mapWishOnly)applySpotFilter();}}
 let mapWishOnly=false;
+let mapCat="";
+const CATLBL={"\u{1F6CF}\u{FE0F}":"Où dormir","\u{1F9D7}":"Via ferrata","\u{26F0}\u{FE0F}":"Montagnes & cols","\u{1F3DE}\u{FE0F}":"Lacs","\u{1F4A7}":"Cascades & gorges","\u{1F3EF}":"Châteaux & cités","\u{1F333}":"Parcs & vallées","\u{1F6CD}\u{FE0F}":"Villages & marchés","\u{1F309}":"Ponts","\u{1F3DB}\u{FE0F}":"Musées","\u{1F573}\u{FE0F}":"Grottes","\u{1F6D5}":"Sanctuaires","\u{1F3D6}\u{FE0F}":"Plages","\u{1F3DD}\u{FE0F}":"Îles","\u{1F93F}":"Plongée","\u{1F6F6}":"Bateau","\u{1F9F1}":"Muraille","\u{1F5FF}":"Monuments","\u{1F35C}":"Restaurants","\u{1F4CD}":"Autres"};
+function spotCat(n){const r=spotMarkers[n];return (r&&r.resto)?"\u{1F35C}":spotEmoji(n);}
+function setMapCat(v){mapCat=v;applySpotFilter();buildMapCtrl();
+  if(mapCat&&map){const pts=Object.keys(spotMarkers).filter(n=>spotCat(n)===mapCat).map(n=>spotMarkers[n].marker.getLatLng());
+    if(pts.length)map.fitBounds(L.latLngBounds(pts),{padding:[40,40],maxZoom:11});}}
 function updateSpotsVis(){if(!map||!spotsLayer)return;if(mapWishOnly){if(!map.hasLayer(spotsLayer))map.addLayer(spotsLayer);return;}const z=map.getZoom();if(z>=6){if(!map.hasLayer(spotsLayer))map.addLayer(spotsLayer);}else{if(map.hasLayer(spotsLayer))map.removeLayer(spotsLayer);}}
-function applySpotFilter(){if(!spotsLayer)return;spotsLayer.clearLayers();Object.keys(spotMarkers).forEach(n=>{if(mapWishOnly&&!isWished(n))return;spotsLayer.addLayer(spotMarkers[n].marker);});updateSpotsVis();}
+function applySpotFilter(){if(!spotsLayer)return;spotsLayer.clearLayers();Object.keys(spotMarkers).forEach(n=>{if(mapWishOnly&&!isWished(n))return;if(mapCat&&spotCat(n)!==mapCat)return;spotsLayer.addLayer(spotMarkers[n].marker);});updateSpotsVis();}
 function toggleWishFilter(){mapWishOnly=!mapWishOnly;applySpotFilter();buildMapCtrl();
   if(mapWishOnly&&map){const pts=Object.keys(spotMarkers).filter(n=>isWished(n)).map(n=>SPOT_CO[n]).filter(Boolean);if(pts.length)map.fitBounds(L.latLngBounds(pts),{padding:[40,40],maxZoom:12});}}
-function buildMapCtrl(){const el=document.getElementById('mapctrl');if(!el)return;const cnt=Object.keys(S.wishlist||{}).length;
-  el.innerHTML=`<button class="chip" style="box-shadow:0 2px 8px rgba(0,0,0,.28)" onclick="openWishlist()">⭐ À voir (${cnt})</button><button class="chip ${mapWishOnly?'on':''}" style="box-shadow:0 2px 8px rgba(0,0,0,.28)" onclick="toggleWishFilter()">Carte : ${mapWishOnly?'⭐ seulement ✔':'tout'}</button>`;}
+function buildMapCtrl(){const el=document.getElementById("mapctrl");if(!el)return;
+  const cnt=Object.keys(S.wishlist||{}).length;
+  const cats={};Object.keys(spotMarkers).forEach(n=>{const c=spotCat(n);cats[c]=(cats[c]||0)+1;});
+  const ks=Object.keys(cats).sort((a,b)=>cats[b]-cats[a]);
+  const opts=ks.map(c=>'<option value="'+c+'"'+(c===mapCat?" selected":"")+">"+c+" "+(CATLBL[c]||"")+" ("+cats[c]+")</option>").join("");
+  const sh='box-shadow:0 2px 8px rgba(0,0,0,.28)';
+  const sel='<select class="chip" style="'+sh+';max-width:200px;padding:6px 9px;font-size:12px" onchange="setMapCat(this.value)"><option value="">Toutes les catégories</option>'+opts+"</select>";
+  el.innerHTML='<button class="chip" style="'+sh+'" onclick="openWishlist()">⭐ À voir ('+cnt+')</button>'
+    +'<button class="chip '+(mapWishOnly?"on":"")+'" style="'+sh+'" onclick="toggleWishFilter()">Carte : '+(mapWishOnly?"⭐ seulement ✔":"tout")+"</button>"
+    +sel;}
 function openWishlist(){
   const w=S.wishlist||{};const total=Object.keys(w).length;const shown={};let body='';
   if(!total)body=`<div class="empty">Aucun lieu en « à voir ».<br>Touche l'étoile ☆ sur un lieu (carte ou itinéraire) pour l'ajouter.</div>`;
