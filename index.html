@@ -617,7 +617,7 @@ function openSync(){
 /* ============ APPLI INSTALLABLE + NOTIFICATIONS PUSH ============ */
 const VAPID_PUBLIC="BP_AP4FOamPTOp16r_xJ9B-BTE7JzAlRQdm3YyjdXmGidbZVC7wapqCyYOXqzgVOlP1Xlo356c-RHy7BLpqT5Ec";
 let swReg=null,deferredInstall=null;
-const OFFLINE_CACHE='voyages-v7';
+const OFFLINE_CACHE='voyages-v8';
 const OFFLINE_FILES=['./','index.html','manifest.json','vols.html','icon-192.png','icon-512.png','apple-touch-icon.png','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js'];
 async function prepareOffline(){
   const btn=$('#offline-prepare'),status=$('#offline-status');
@@ -641,7 +641,7 @@ function isStandalone(){return window.matchMedia('(display-mode: standalone)').m
 function isiOS(){return /iphone|ipad|ipod/i.test(navigator.userAgent);}
 function pushSupported(){return('serviceWorker'in navigator)&&('PushManager'in window)&&('Notification'in window);}
 function initPWA(){
-  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js?v=20261010-offline',{updateViaCache:'none'}).then(r=>{swReg=r;r.update().catch(()=>{});}).catch(()=>{});}
+  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js?v=20261010-mapfilters',{updateViaCache:'none'}).then(r=>{swReg=r;r.update().catch(()=>{});}).catch(()=>{});}
   window.addEventListener('beforeinstallprompt',ev=>{ev.preventDefault();deferredInstall=ev;});
   window.addEventListener('offline',()=>setSyncPill('off'));
   window.addEventListener('online',()=>{if(SYNC.user){bootTrips();if(syncActive())pushCloud(true);}fetchRates(true);});
@@ -656,7 +656,7 @@ async function enablePush(){
   if(!pushSupported()){toast('Notifications non supportées sur ce navigateur');return;}
   if(isiOS()&&!isStandalone()){toast("iPhone : ajoute d'abord à l'écran d'accueil, puis rouvre depuis l'icône");return;}
   try{
-    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js?v=20261010-offline',{updateViaCache:'none'});
+    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js?v=20261010-mapfilters',{updateViaCache:'none'});
     await navigator.serviceWorker.ready;
     const perm=await Notification.requestPermission();
     if(perm!=='granted'){toast('Notifications refusées dans les réglages');return;}
@@ -1124,7 +1124,7 @@ let map,mapRouteBounds;
 let CFLAG={};
 let SPOT_CO={};
 let RESTO_CO={};
-let spotMarkers={},spotsLayer=null;
+let spotMarkers={},spotsLayer=null,citiesLayer=null,routeLayer=null;
 function isWished(n){return !!(S.wishlist&&S.wishlist[n]);}
 function spotEmoji(n){const s=(n||'').toLowerCase();
   if(/wat |temple|pagode|pagoda|sanctuaire|monast|shrine|inari|-ji|tōdai|todai|torii|stupa|that luang|angkor|bayon|prohm|banteay|xieng thong|songzanlin|kushida|itsukushima|senso/.test(s))return '🛕';
@@ -1158,13 +1158,17 @@ function toggleWishMap(n){S.wishlist=S.wishlist||{};if(S.wishlist[n])delete S.wi
 function toggleWishItin(n,el){S.wishlist=S.wishlist||{};if(S.wishlist[n])delete S.wishlist[n];else S.wishlist[n]=true;save();
   if(el){el.textContent=S.wishlist[n]?'★':'☆';el.classList.toggle('on',!!S.wishlist[n]);}
   if(mapInited){if(spotMarkers[n])refreshSpotMarker(n,false);buildMapCtrl();if(mapWishOnly)applySpotFilter();}}
-let mapWishOnly=false;
-function updateSpotsVis(){if(!map||!spotsLayer)return;if(mapWishOnly){if(!map.hasLayer(spotsLayer))map.addLayer(spotsLayer);return;}const z=map.getZoom();if(z>=6){if(!map.hasLayer(spotsLayer))map.addLayer(spotsLayer);}else{if(map.hasLayer(spotsLayer))map.removeLayer(spotsLayer);}}
-function applySpotFilter(){if(!spotsLayer)return;spotsLayer.clearLayers();Object.keys(spotMarkers).forEach(n=>{if(mapWishOnly&&!isWished(n))return;spotsLayer.addLayer(spotMarkers[n].marker);});updateSpotsVis();}
-function toggleWishFilter(){mapWishOnly=!mapWishOnly;applySpotFilter();buildMapCtrl();
-  if(mapWishOnly&&map){const pts=Object.keys(spotMarkers).filter(n=>isWished(n)).map(n=>SPOT_CO[n]).filter(Boolean);if(pts.length)map.fitBounds(L.latLngBounds(pts),{padding:[40,40],maxZoom:12});}}
+let mapWishOnly=false,mapCategory='all';
+const MAP_CATEGORIES=[{id:'all',label:'Tout afficher'},{id:'restaurants',label:'🍜 Restaurants'},{id:'temples',label:'🛕 Temples et sanctuaires'},{id:'culture',label:'🏛️ Musées et monuments'},{id:'nature',label:'⛰️ Nature et grottes'},{id:'beaches',label:'🏖️ Plages et îles'},{id:'markets',label:'🛍️ Marchés'},{id:'other',label:'📍 Autres lieux'},{id:'cities',label:'🔢 Villes et parcours'}];
+function mapSpotCategory(r,n){if(r.resto)return 'restaurants';const em=spotEmoji(n);if(em==='🛕')return 'temples';if(['🏛️','🏯','🧱','🗿','🌉'].includes(em))return 'culture';if(['⛰️','💧','🕳️','🏞️','🌳','🛶'].includes(em))return 'nature';if(['🏖️','🏝️'].includes(em))return 'beaches';if(em==='🛍️')return 'markets';return 'other';}
+function mapSpotMatches(n){const r=spotMarkers[n];return !!r&&(!mapWishOnly||isWished(n))&&(mapCategory==='all'||mapSpotCategory(r,n)===mapCategory);}
+function updateSpotsVis(){if(!map||!spotsLayer)return;const showSpots=mapCategory!=='cities'&&(mapWishOnly||mapCategory!=='all'||map.getZoom()>=6);if(showSpots){if(!map.hasLayer(spotsLayer))map.addLayer(spotsLayer);}else if(map.hasLayer(spotsLayer))map.removeLayer(spotsLayer);const showRoute=!mapWishOnly&&(mapCategory==='all'||mapCategory==='cities');[citiesLayer,routeLayer].forEach(layer=>{if(!layer)return;if(showRoute){if(!map.hasLayer(layer))map.addLayer(layer);}else if(map.hasLayer(layer))map.removeLayer(layer);});}
+function applySpotFilter(){if(!spotsLayer)return;spotsLayer.clearLayers();Object.keys(spotMarkers).forEach(n=>{if(mapSpotMatches(n))spotsLayer.addLayer(spotMarkers[n].marker);});updateSpotsVis();}
+function setMapCategory(id){if(!MAP_CATEGORIES.some(c=>c.id===id))return;mapCategory=id;try{localStorage.setItem('td_map_category_'+TRIP,id);}catch(e){}applySpotFilter();buildMapCtrl();if(!['all','cities'].includes(id)&&!Object.keys(spotMarkers).some(mapSpotMatches))toast('Aucun lieu géolocalisé dans ce filtre.');}
+function toggleWishFilter(){mapWishOnly=!mapWishOnly;if(mapWishOnly&&mapCategory==='cities')setMapCategory('all');applySpotFilter();buildMapCtrl();
+  if(mapWishOnly&&map){const pts=Object.keys(spotMarkers).filter(mapSpotMatches).map(n=>spotMarkers[n].marker.getLatLng());if(pts.length)map.fitBounds(L.latLngBounds(pts),{padding:[40,40],maxZoom:12});}}
 function buildMapCtrl(){const el=document.getElementById('mapctrl');if(!el)return;const cnt=Object.keys(S.wishlist||{}).length;
-  el.innerHTML=`<button class="chip" style="box-shadow:0 2px 8px rgba(0,0,0,.28)" onclick="openWishlist()">⭐ À voir (${cnt})</button><button class="chip ${mapWishOnly?'on':''}" style="box-shadow:0 2px 8px rgba(0,0,0,.28)" onclick="toggleWishFilter()">Carte : ${mapWishOnly?'⭐ seulement ✔':'tout'}</button><button class="chip" onclick="toggleMapSize()">${document.getElementById('mapwrap').classList.contains('map-expanded')?'↙ Réduire':'⛶ Agrandir'}</button><button class="chip" onclick="showMapRoute()">🌏 Tout le parcours</button>`;}
+  el.innerHTML=`<select id="map-category" aria-label="Catégorie de lieux sur la carte" onchange="setMapCategory(this.value)" style="width:auto;max-width:210px;padding:9px;background:var(--card);box-shadow:var(--sh);font-size:13px">${MAP_CATEGORIES.map(c=>`<option value="${c.id}" ${mapCategory===c.id?'selected':''}>${c.label}</option>`).join('')}</select><button class="chip" style="box-shadow:0 2px 8px rgba(0,0,0,.28)" onclick="openWishlist()">⭐ À voir (${cnt})</button><button class="chip ${mapWishOnly?'on':''}" style="box-shadow:0 2px 8px rgba(0,0,0,.28)" onclick="toggleWishFilter()">${mapWishOnly?'⭐ Favoris seulement ✔':'⭐ Favoris seulement'}</button><button class="chip" onclick="toggleMapSize()">${document.getElementById('mapwrap').classList.contains('map-expanded')?'↙ Réduire':'⛶ Agrandir'}</button><button class="chip" onclick="showMapRoute()">🌏 Tout le parcours</button>`;}
 function toggleMapSize(){const el=document.getElementById('mapwrap');el.classList.toggle('map-expanded');buildMapCtrl();setTimeout(()=>{if(map)map.invalidateSize();el.scrollIntoView({block:'start',behavior:'smooth'});},60);}
 function showMapRoute(){if(map&&mapRouteBounds)map.fitBounds(mapRouteBounds,{padding:[45,45]});}
 function openWishlist(){
@@ -1190,7 +1194,7 @@ function initMap(){
   L.control.scale({imperial:false,position:'bottomleft'}).addTo(map);
   const t=today();let curStage=null;for(const st of STAGES){if(t>=pd(st.start)&&t<pd(st.end)){curStage=st;break;}}
   const allPts=[];let idx=0;let prevEnd=null;
-  spotsLayer=L.layerGroup();spotMarkers={};const added={};
+  spotsLayer=L.layerGroup();citiesLayer=L.layerGroup().addTo(map);routeLayer=L.layerGroup().addTo(map);spotMarkers={};const added={};
   STAGES.forEach(st=>{
     const col=CFLAG[st.id];const pts=[];
     st.blocks.forEach(b=>{
@@ -1202,7 +1206,7 @@ function initMap(){
           <div class="pm">${st.nm} · ${b.dd||fmtRange(st)}</div>
           <a href="https://www.google.com/maps/search/?api=1&query=${b.co[0]},${b.co[1]}" target="_blank" rel="noopener" style="font-size:12px;display:inline-block;margin-top:5px">Ouvrir dans Google Maps ↗</a><br>
           <a href="#" onclick="gotoStage('${st.id}');return false;" style="font-size:12px;display:inline-block;margin-top:3px">Voir l'étape dans l'itinéraire →</a></div>`;
-        L.marker(b.co,{icon,riseOnHover:true}).addTo(map).bindPopup(pop).bindTooltip(b.c);
+        L.marker(b.co,{icon,riseOnHover:true}).addTo(citiesLayer).bindPopup(pop).bindTooltip(b.c);
       }
       if(b.spots)b.spots.forEach(sp=>{const so=(typeof sp==='string')?{n:sp}:sp;const n=so.n;if(added[n])return;const co=SPOT_CO[n];if(!co)return;added[n]=1;
         const m=L.marker(co,{icon:spotIcon(col,isWished(n),n)}).bindPopup(spotPopup(st,b,so),{maxWidth:250});
@@ -1211,14 +1215,14 @@ function initMap(){
         const m=L.marker(co,{icon:spotIcon(col,isWished(n),n,true)}).bindPopup(spotPopup(st,b,rr,true),{maxWidth:250});
         spotMarkers[n]={marker:m,col,st,b,sp:rr,resto:true};spotsLayer.addLayer(m);});
     });
-    if(pts.length>1)L.polyline(pts,{color:col,weight:3.5,opacity:.8}).addTo(map);
-    if(prevEnd&&pts.length)L.polyline([prevEnd,pts[0]],{color:'#9a9084',weight:1.6,opacity:.55,dashArray:'2 7'}).addTo(map);
+    if(pts.length>1)L.polyline(pts,{color:col,weight:3.5,opacity:.8}).addTo(routeLayer);
+    if(prevEnd&&pts.length)L.polyline([prevEnd,pts[0]],{color:'#9a9084',weight:1.6,opacity:.55,dashArray:'2 7'}).addTo(routeLayer);
     if(pts.length)prevEnd=pts[pts.length-1];
   });
   let lg='<span style="flex-basis:100%;color:var(--muted);font-size:11px">Chiffres = villes (ordre du voyage) · <b>zoome</b> pour voir les lieux (🛕🏖️…) et restos (🍜) · ⭐ = à voir · pointillés = vols</span>';
   BUDGET_PREVU.filter(b=>CFLAG[b.id]).forEach(b=>{lg+=`<span><i style="background:${CFLAG[b.id]}"></i>${b.fl} ${b.nm}</span>`;});
   $('#legend').innerHTML=lg;
-  mapWishOnly=false;buildMapCtrl();
+  mapWishOnly=false;try{mapCategory=localStorage.getItem('td_map_category_'+TRIP)||'all';}catch(e){mapCategory='all';}if(!MAP_CATEGORIES.some(c=>c.id===mapCategory))mapCategory='all';applySpotFilter();buildMapCtrl();
   map.on('zoomend',updateSpotsVis);
   mapRouteBounds=allPts.length?L.latLngBounds(allPts):null;
   if(mapRouteBounds)map.fitBounds(mapRouteBounds,{padding:[30,30]});
