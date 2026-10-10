@@ -462,17 +462,18 @@ function mergeStates(a,b){
 }
 function lockUI(){document.body.classList.add('locked');['today','itin','budget','rem'].forEach(v=>{const el=document.getElementById('v-'+v);if(el)el.innerHTML='';});}
 function unlockUI(){document.body.classList.remove('locked');}
+let HANDBOOK={};
 /* ===== Multi-voyages : contenu chargé depuis Firebase (plus dans le code public) ===== */
 function applyContent(str){
   try{var c=JSON.parse(str);if(!c||!c.STAGES||!c.STAGES.length)return false;
-    STAGES=c.STAGES; SOCIAL=c.SOCIAL||{}; PRATIQUE=c.PRATIQUE||{}; PACK=c.PACK||[];
+    HANDBOOK=c.HANDBOOK||{};STAGES=c.STAGES; SOCIAL=c.SOCIAL||{}; PRATIQUE=c.PRATIQUE||{}; PACK=c.PACK||[];
     RESTO_CO=c.RESTO_CO||{}; SPOT_CO=c.SPOT_CO||{}; REMINDERS=c.REMINDERS||[]; CHECK=c.CHECK||[]; BUDGET_PREVU=c.BUDGET_PREVU||[];
     GALLERY=c.GALLERY||[]; COUNTRY_CUR=c.COUNTRY_CUR||{}; CFLAG=c.CFLAG||{};
     if(STAGES.length){TRIP_START=STAGES[0].start||"";TRIP_END=STAGES[STAGES.length-1].end||"";}
     return true;
   }catch(e){return false;}
 }
-function clearContent(){STAGES=[];SOCIAL={};PRATIQUE={};PACK=[];RESTO_CO={};SPOT_CO={};REMINDERS=[];CHECK=[];BUDGET_PREVU=[];GALLERY=[];COUNTRY_CUR={};CFLAG={};}
+function clearContent(){HANDBOOK={};STAGES=[];SOCIAL={};PRATIQUE={};PACK=[];RESTO_CO={};SPOT_CO={};REMINDERS=[];CHECK=[];BUDGET_PREVU=[];GALLERY=[];COUNTRY_CUR={};CFLAG={};}
 function fmtD(s){try{return new Date(s+'T00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'});}catch(e){return s;}}
 function tripDates(){return (TRIP_START&&TRIP_END)?('Du '+fmtD(TRIP_START)+' au '+fmtD(TRIP_END)):'';}
 function setTripName(){var m=TRIPS[TRIP]||{};var el=document.getElementById('tripname');if(el)el.textContent=m.name||'Voyage';}
@@ -617,7 +618,7 @@ function openSync(){
 /* ============ APPLI INSTALLABLE + NOTIFICATIONS PUSH ============ */
 const VAPID_PUBLIC="BP_AP4FOamPTOp16r_xJ9B-BTE7JzAlRQdm3YyjdXmGidbZVC7wapqCyYOXqzgVOlP1Xlo356c-RHy7BLpqT5Ec";
 let swReg=null,deferredInstall=null;
-const OFFLINE_CACHE='voyages-v13';
+const OFFLINE_CACHE='voyages-v14';
 const OFFLINE_FILES=['./','index.html','manifest.json','vols.html','icon-192.png','icon-512.png','apple-touch-icon.png','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js'];
 async function prepareOffline(){
   const btn=$('#offline-prepare'),status=$('#offline-status');
@@ -641,7 +642,7 @@ function isStandalone(){return window.matchMedia('(display-mode: standalone)').m
 function isiOS(){return /iphone|ipad|ipod/i.test(navigator.userAgent);}
 function pushSupported(){return('serviceWorker'in navigator)&&('PushManager'in window)&&('Notification'in window);}
 function initPWA(){
-  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js?v=20261010-bags40',{updateViaCache:'none'}).then(r=>{swReg=r;r.update().catch(()=>{});}).catch(()=>{});}
+  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js?v=20261010-handbook',{updateViaCache:'none'}).then(r=>{swReg=r;r.update().catch(()=>{});}).catch(()=>{});}
   window.addEventListener('beforeinstallprompt',ev=>{ev.preventDefault();deferredInstall=ev;});
   window.addEventListener('offline',()=>setSyncPill('off'));
   window.addEventListener('online',()=>{if(SYNC.user){bootTrips();if(syncActive())pushCloud(true);}fetchRates(true);});
@@ -656,7 +657,7 @@ async function enablePush(){
   if(!pushSupported()){toast('Notifications non supportées sur ce navigateur');return;}
   if(isiOS()&&!isStandalone()){toast("iPhone : ajoute d'abord à l'écran d'accueil, puis rouvre depuis l'icône");return;}
   try{
-    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js?v=20261010-bags40',{updateViaCache:'none'});
+    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js?v=20261010-handbook',{updateViaCache:'none'});
     await navigator.serviceWorker.ready;
     const perm=await Notification.requestPermission();
     if(perm!=='granted'){toast('Notifications refusées dans les réglages');return;}
@@ -742,6 +743,7 @@ function renderToday(){
     <div class="stat"><div class="n">${eur(spent)}</div><div class="l">dépensé</div></div>
   </div>`;
 
+  html+=handbookHtml('today');
   // prochain rappel
   const next=nextReminder();
   if(next){
@@ -797,9 +799,13 @@ function pratiqueHtml(st){
     </div>
   </div>`;
 }
+function handbookPanel(title,rows){return `<details class="card" style="margin:10px 0;padding:12px"><summary style="font-weight:700;cursor:pointer">${title}</summary><div style="margin-top:10px">${rows.map(r=>`<div class="prat-row"><b>${r[0]}</b><div>${r[1]}</div></div>`).join('')}</div></details>`;}
+function handbookHtml(id){return (HANDBOOK.sections||[]).filter(x=>!id||x.id===id).map(x=>handbookPanel(x.title,x.rows)).join('');}
+function destinationGuideHtml(b){return b.practical?handbookPanel('🧭 Préparer cette étape — arrivée, visites et départ',b.practical):'';}
+function dayGuideHtml(d){return d.practical?`<details style="margin:8px 0;font-size:12.5px"><summary style="cursor:pointer;font-weight:700">📝 Conseils pour cette journée</summary><div style="margin-top:6px;color:var(--ink2)">${d.practical}</div></details>`:'';}
 function renderItin(){
   const t=today();let cur=null;for(const st of STAGES){if(t>=pd(st.start)&&t<pd(st.end)){cur=st;break;}}
-  let html=`<div class="sec-title">${STAGES.length} étapes · ${tripDates()} · ${TRAVELERS} pers</div>`;
+  let html=`<div class="sec-title">${STAGES.length} étapes · ${tripDates()} · ${TRAVELERS} pers</div>${handbookHtml('itin')}${handbookHtml('open')}`;
   STAGES.forEach(st=>{
     const tot=stageUnits(st),dsc=stageDone(st),pct=Math.round(dsc/tot*100),now=cur&&cur.id===st.id;
     html+=`<div class="stage ${now?'open':''}" id="stg-${st.id}">
@@ -818,7 +824,7 @@ function renderItin(){
         <div class="sb-line"><span class="k">Visa</span><span>${st.visa}</span></div>
         ${st.note?`<div class="sb-line"><span class="k">À noter</span><span>${st.note}</span></div>`:''}
         <div class="film"><b>📸 À filmer :</b> ${st.film}</div>
-        ${st.blocks.map(b=>blockHtml(st,b)).join('')}
+        ${pratiqueHtml(st)}${st.blocks.map(b=>blockHtml(st,b)).join('')}
       </div></div>`;
   });
   $('#v-itin').innerHTML=html;
@@ -886,15 +892,15 @@ function blockHtml(st,b){
         <div class="cb ${all?'on':''}" onclick="toggleBlockDays('${st.id}','${esc(b.c)}',event)"></div>
         <div class="bt" onclick="toggleDays('${cssId(bid)}')"><div class="c">${b.c}</div><div class="dd">${b.dd}</div></div>
         ${mapl}<div class="exp" onclick="toggleDays('${cssId(bid)}')">▾</div></div>
-      <div class="days">${b.days.map(d=>{const done=S.days[st.id+'-'+d.n];return`
+      ${destinationGuideHtml(b)}<div class="days">${b.days.map(d=>{const done=S.days[st.id+'-'+d.n];return`
         <div class="day ${done?'done':''}"><div class="cb ${done?'on':''}" onclick="toggleDay('${st.id}',${d.n})"></div>
-          <span class="num">J${d.n}</span><div class="dtx"><span class="dc">${d.dt}</span> — ${d.t}${fichesHtml(st,b,d.sp)}</div></div>`;}).join('')}</div>${restoHtml(st,b)}${socialHtml(st,b)}</div>`;
+          <span class="num">J${d.n}</span><div class="dtx"><span class="dc">${d.dt}</span> — ${d.t}${dayGuideHtml(d)}${fichesHtml(st,b,d.sp)}</div></div>`;}).join('')}</div>${restoHtml(st,b)}${socialHtml(st,b)}</div>`;
   }
   const done=S.blocks[bid];
   return `<div class="block"><div class="block-h ${done?'done':''}">
     <div class="cb ${done?'on':''}" onclick="toggleSimpleBlock('${st.id}','${esc(b.c)}')"></div>
     <div class="bt"><div class="c">${b.c} <span style="color:var(--muted);font-weight:400;font-size:12px">· ${b.dd}</span></div>
-    <div class="dd" style="margin-top:3px">${b.sum}</div></div>${mapl}</div>${spotsHtml(st,b)}${restoHtml(st,b)}${socialHtml(st,b)}</div>`;
+    <div class="dd" style="margin-top:3px">${b.sum}</div></div>${mapl}</div>${destinationGuideHtml(b)}${spotsHtml(st,b)}${restoHtml(st,b)}${socialHtml(st,b)}</div>`;
 }
 function toggleStage(id){$('#stg-'+id).classList.toggle('open');}
 function toggleDays(cid){$('#blk-'+cid).classList.toggle('open');}
@@ -967,6 +973,7 @@ function renderBudget(){
     <div class="pmeta" style="margin-top:6px">sur ${eur(prevu)} prévus · reste ${eur(prevu-spent)}</div>
     <div class="pbar"><i style="width:${Math.min(100,spent/prevu*100)}%"></i></div>
     <div class="pmeta"><span>${Math.round(spent/prevu*100)}% du budget</span><span>${eur(spent/TRAVELERS)}/pers</span></div></div>`;
+  html+=handbookHtml('budget');
   html+=`<div style="text-align:center;margin:-4px 0 12px"><button class="chip" onclick="openRates()">💱 Taux de change</button></div>`;
   const byM=S.expenses.filter(e=>(e.by||'marie')==='marie').reduce((a,e)=>a+toEur(e),0);
   const byB=S.expenses.filter(e=>e.by==='baptiste').reduce((a,e)=>a+toEur(e),0);
@@ -1043,6 +1050,7 @@ function renderRem(){
   let html=`<div class="seg"><button class="${remTab==='ech'?'on':''}" onclick="setRemTab('ech')">🔔 Échéances</button>
     <button class="${remTab==='prep'?'on':''}" onclick="setRemTab('prep')">🧳 Préparatifs</button>
     <button class="${remTab==='pack'?'on':''}" onclick="setRemTab('pack')">🎒 Bagages</button></div>`;
+  html+=handbookHtml('rem');
   if(remTab==='ech'){
     html+=`<div class="info">🔔 Les rappels marqués <b>notification programmée</b> t'arrivent en <b>notification push</b> sur ton téléphone, même carnet fermé, et se relancent chaque semaine jusqu'à ce que tu répondes « c'est fait ». Ceux-ci s'affichent aussi ici pour t'en souvenir.</div>`;
     const rems=[...REMINDERS].sort((a,b)=>pd(a.date)-pd(b.date));
@@ -1330,10 +1338,11 @@ function guideHtml(st){
 function renderGuide(){
   const el=$('#v-guide'); if(!el)return;
   if(!STAGES.length){el.innerHTML='<div class="empty">Choisis un voyage pour voir les infos pratiques.</div>';return;}
-  let html=`<div class="sec-title">Infos pratiques & guides — par pays</div>`;
+  let html=`<div class="sec-title">Mode d’emploi du voyage</div>${handbookHtml()}<div class="sec-title">Infos pratiques & guides — par pays</div>`;
   STAGES.forEach(st=>{
     html+=`<div style="margin-bottom:16px"><div style="font-family:var(--disp);font-weight:700;font-size:19px;color:var(--ink);margin:2px 2px 8px">${st.fl} ${st.nm}</div>${guideHtml(st)}${pratiqueHtml(st)}</div>`;
   });
+  if(HANDBOOK.sources?.length)html+=handbookPanel('🔎 Sources et informations à revalider',[["Mise à jour",HANDBOOK.updated||''],...HANDBOOK.sources.map(x=>[x[0],`<a href="${x[1]}" target="_blank" rel="noopener">Ouvrir la source officielle</a>`])]);
   el.innerHTML=html;
 }
 function renderAll(){renderToday();renderItin();renderBudget();renderRem();renderGuide();}
