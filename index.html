@@ -246,6 +246,11 @@ header{position:sticky;top:0;z-index:20;background:rgba(244,239,231,.86);backdro
 #map{height:calc(100vh - 250px);min-height:360px;border-radius:var(--r);border:1px solid var(--line);overflow:hidden;box-shadow:var(--sh);touch-action:none}
 .leaflet-container{touch-action:none!important}
 .leaflet-container{background:#e8e0d2;font-family:inherit}
+.map-expanded #map{height:calc(100dvh - 130px);min-height:420px}
+.leaflet-popup-content{font-size:14px;line-height:1.5}
+.leaflet-tooltip{font-size:13px;font-weight:600}
+.leaflet-control-zoom a{width:38px!important;height:38px!important;line-height:38px!important}
+.leaflet-control-layers{font-size:13px}
 .legend{display:flex;flex-wrap:wrap;gap:7px 13px;margin:12px 3px 0;font-size:12px;color:var(--ink2)}
 .legend span{display:inline-flex;align-items:center;gap:5px}
 .legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
@@ -339,7 +344,7 @@ body.locked header,body.locked main,body.locked .nav,body.locked #fab{display:no
   <section id="v-itin" class="view hidden"></section>
   <section id="v-map" class="view hidden">
     <div class="sec-title">Le parcours</div>
-    <div style="position:relative;z-index:0">
+    <div id="mapwrap" style="position:relative;z-index:0">
       <div id="mapctrl" style="position:absolute;z-index:600;top:9px;right:9px;display:flex;flex-direction:column;gap:6px;align-items:flex-end"></div>
       <div id="map"></div>
     </div>
@@ -1089,7 +1094,7 @@ function checkDue(){try{if(!('Notification'in window)||Notification.permission!=
   }catch(e){}}
 
 /* ============ CARTE ============ */
-let map;
+let map,mapRouteBounds;
 let CFLAG={};
 let SPOT_CO={};
 let RESTO_CO={};
@@ -1113,9 +1118,9 @@ function spotEmoji(n){const s=(n||'').toLowerCase();
   if(/muraille|great wall|jinshanling/.test(s))return '🧱';
   if(/terre cuite|guerrier/.test(s))return '🗿';
   return '📍';}
-function spotIcon(col,on,n,resto){const em=resto?'🍜':spotEmoji(n);const sz=on?26:22;const bd=on?'#e8b64a':(resto?'#c98a5b':col);
+function spotIcon(col,on,n,resto){const em=resto?'🍜':spotEmoji(n);const sz=on?34:30;const bd=on?'#e8b64a':(resto?'#c98a5b':col);
   return L.divIcon({className:'',iconSize:[sz,sz],iconAnchor:[sz/2,sz/2],
-    html:`<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:${on?'#fff3d6':'rgba(255,255,255,.94)'};border:2px solid ${bd};box-shadow:0 1px 3px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;font-size:${on?15:13}px">${em}</div>`});}
+    html:`<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:${on?'#fff3d6':'rgba(255,255,255,.96)'};border:2px solid ${bd};box-shadow:0 1px 3px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;font-size:${on?19:17}px">${em}</div>`});}
 function spotPopup(st,b,sp,resto){const on=isWished(sp.n);
   return `<div class="pop" style="max-width:230px"><b>${resto?'🍜 ':''}${sp.n}</b>${on?' ⭐':''}
     ${sp.p?`<div class="pm">💰 ${sp.p}</div>`:''}
@@ -1133,7 +1138,9 @@ function applySpotFilter(){if(!spotsLayer)return;spotsLayer.clearLayers();Object
 function toggleWishFilter(){mapWishOnly=!mapWishOnly;applySpotFilter();buildMapCtrl();
   if(mapWishOnly&&map){const pts=Object.keys(spotMarkers).filter(n=>isWished(n)).map(n=>SPOT_CO[n]).filter(Boolean);if(pts.length)map.fitBounds(L.latLngBounds(pts),{padding:[40,40],maxZoom:12});}}
 function buildMapCtrl(){const el=document.getElementById('mapctrl');if(!el)return;const cnt=Object.keys(S.wishlist||{}).length;
-  el.innerHTML=`<button class="chip" style="box-shadow:0 2px 8px rgba(0,0,0,.28)" onclick="openWishlist()">⭐ À voir (${cnt})</button><button class="chip ${mapWishOnly?'on':''}" style="box-shadow:0 2px 8px rgba(0,0,0,.28)" onclick="toggleWishFilter()">Carte : ${mapWishOnly?'⭐ seulement ✔':'tout'}</button>`;}
+  el.innerHTML=`<button class="chip" style="box-shadow:0 2px 8px rgba(0,0,0,.28)" onclick="openWishlist()">⭐ À voir (${cnt})</button><button class="chip ${mapWishOnly?'on':''}" style="box-shadow:0 2px 8px rgba(0,0,0,.28)" onclick="toggleWishFilter()">Carte : ${mapWishOnly?'⭐ seulement ✔':'tout'}</button><button class="chip" onclick="toggleMapSize()">${document.getElementById('mapwrap').classList.contains('map-expanded')?'↙ Réduire':'⛶ Agrandir'}</button><button class="chip" onclick="showMapRoute()">🌏 Tout le parcours</button>`;}
+function toggleMapSize(){const el=document.getElementById('mapwrap');el.classList.toggle('map-expanded');buildMapCtrl();setTimeout(()=>{if(map)map.invalidateSize();el.scrollIntoView({block:'start',behavior:'smooth'});},60);}
+function showMapRoute(){if(map&&mapRouteBounds)map.fitBounds(mapRouteBounds,{padding:[45,45]});}
 function openWishlist(){
   const w=S.wishlist||{};const total=Object.keys(w).length;const shown={};let body='';
   if(!total)body=`<div class="empty">Aucun lieu en « à voir ».<br>Touche l'étoile ☆ sur un lieu (carte ou itinéraire) pour l'ajouter.</div>`;
@@ -1151,8 +1158,12 @@ function initMap(){
   if(mapInited)return;
   if(typeof L==='undefined'){$('#map').innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:24px;color:var(--muted)"><div style="font-size:34px;margin-bottom:10px">🗺️</div><b style="color:var(--ink)">Carte indisponible hors-ligne</b><br><span style="font-size:13px;margin-top:6px">Reconnecte-toi à internet puis rouvre cet onglet.</span></div>';return;}
   mapInited=true;
-  map=L.map('map',{zoomControl:true,attributionControl:false}).setView([16,105],4);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:18,subdomains:'abcd'}).addTo(map);
+  map=L.map('map',{zoomControl:true,attributionControl:true,maxZoom:19}).setView([16,105],4);
+  const osmAttribution='&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>';
+  const streets=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,maxNativeZoom:19,attribution:osmAttribution}).addTo(map);
+  const light=L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:19,maxNativeZoom:19,subdomains:'abcd',attribution:osmAttribution+' &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>'});
+  L.control.layers({'Rues et détails':streets,'Fond clair':light},null,{position:'bottomleft'}).addTo(map);
+  L.control.scale({imperial:false,position:'bottomleft'}).addTo(map);
   const t=today();let curStage=null;for(const st of STAGES){if(t>=pd(st.start)&&t<pd(st.end)){curStage=st;break;}}
   const allPts=[];let idx=0;let prevEnd=null;
   spotsLayer=L.layerGroup();spotMarkers={};const added={};
@@ -1160,14 +1171,14 @@ function initMap(){
     const col=CFLAG[st.id];const pts=[];
     st.blocks.forEach(b=>{
       if(b.co){idx++;allPts.push(b.co);pts.push(b.co);
-        const cur=curStage&&curStage.id===st.id;const sz=cur?28:22;
+        const cur=curStage&&curStage.id===st.id;const sz=cur?36:30;
         const icon=L.divIcon({className:'',iconSize:[sz,sz],iconAnchor:[sz/2,sz/2],
-          html:`<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:${col};border:2.5px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.45);color:#fff;font-size:${cur?12:11}px;font-weight:800;display:flex;align-items:center;justify-content:center;${cur?'outline:3px solid '+col+'55;outline-offset:1px;':''}">${idx}</div>`});
+          html:`<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:${col};border:2.5px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.45);color:#fff;font-size:${cur?15:14}px;font-weight:800;display:flex;align-items:center;justify-content:center;${cur?'outline:3px solid '+col+'55;outline-offset:1px;':''}">${idx}</div>`});
         const pop=`<div class="pop"><b>${idx}. ${st.fl} ${b.c}</b>${cur?' <span style="color:var(--acc-d);font-weight:700">· ici</span>':''}
           <div class="pm">${st.nm} · ${b.dd||fmtRange(st)}</div>
           <a href="https://www.google.com/maps/search/?api=1&query=${b.co[0]},${b.co[1]}" target="_blank" rel="noopener" style="font-size:12px;display:inline-block;margin-top:5px">Ouvrir dans Google Maps ↗</a><br>
           <a href="#" onclick="gotoStage('${st.id}');return false;" style="font-size:12px;display:inline-block;margin-top:3px">Voir l'étape dans l'itinéraire →</a></div>`;
-        L.marker(b.co,{icon,riseOnHover:true}).addTo(map).bindPopup(pop);
+        L.marker(b.co,{icon,riseOnHover:true}).addTo(map).bindPopup(pop).bindTooltip(b.c);
       }
       if(b.spots)b.spots.forEach(sp=>{const so=(typeof sp==='string')?{n:sp}:sp;const n=so.n;if(added[n])return;const co=SPOT_CO[n];if(!co)return;added[n]=1;
         const m=L.marker(co,{icon:spotIcon(col,isWished(n),n)}).bindPopup(spotPopup(st,b,so),{maxWidth:250});
@@ -1185,7 +1196,8 @@ function initMap(){
   $('#legend').innerHTML=lg;
   mapWishOnly=false;buildMapCtrl();
   map.on('zoomend',updateSpotsVis);
-  if(allPts.length)map.fitBounds(L.latLngBounds(allPts),{padding:[30,30]});
+  mapRouteBounds=allPts.length?L.latLngBounds(allPts):null;
+  if(mapRouteBounds)map.fitBounds(mapRouteBounds,{padding:[30,30]});
   updateSpotsVis();
   setTimeout(()=>{map.invalidateSize();updateSpotsVis();},120);
 }
