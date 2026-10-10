@@ -617,7 +617,7 @@ function openSync(){
 /* ============ APPLI INSTALLABLE + NOTIFICATIONS PUSH ============ */
 const VAPID_PUBLIC="BP_AP4FOamPTOp16r_xJ9B-BTE7JzAlRQdm3YyjdXmGidbZVC7wapqCyYOXqzgVOlP1Xlo356c-RHy7BLpqT5Ec";
 let swReg=null,deferredInstall=null;
-const OFFLINE_CACHE='voyages-v8';
+const OFFLINE_CACHE='voyages-v9';
 const OFFLINE_FILES=['./','index.html','manifest.json','vols.html','icon-192.png','icon-512.png','apple-touch-icon.png','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js'];
 async function prepareOffline(){
   const btn=$('#offline-prepare'),status=$('#offline-status');
@@ -641,7 +641,7 @@ function isStandalone(){return window.matchMedia('(display-mode: standalone)').m
 function isiOS(){return /iphone|ipad|ipod/i.test(navigator.userAgent);}
 function pushSupported(){return('serviceWorker'in navigator)&&('PushManager'in window)&&('Notification'in window);}
 function initPWA(){
-  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js?v=20261010-mapfilters',{updateViaCache:'none'}).then(r=>{swReg=r;r.update().catch(()=>{});}).catch(()=>{});}
+  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js?v=20261010-mapchecks',{updateViaCache:'none'}).then(r=>{swReg=r;r.update().catch(()=>{});}).catch(()=>{});}
   window.addEventListener('beforeinstallprompt',ev=>{ev.preventDefault();deferredInstall=ev;});
   window.addEventListener('offline',()=>setSyncPill('off'));
   window.addEventListener('online',()=>{if(SYNC.user){bootTrips();if(syncActive())pushCloud(true);}fetchRates(true);});
@@ -656,7 +656,7 @@ async function enablePush(){
   if(!pushSupported()){toast('Notifications non supportées sur ce navigateur');return;}
   if(isiOS()&&!isStandalone()){toast("iPhone : ajoute d'abord à l'écran d'accueil, puis rouvre depuis l'icône");return;}
   try{
-    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js?v=20261010-mapfilters',{updateViaCache:'none'});
+    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js?v=20261010-mapchecks',{updateViaCache:'none'});
     await navigator.serviceWorker.ready;
     const perm=await Notification.requestPermission();
     if(perm!=='granted'){toast('Notifications refusées dans les réglages');return;}
@@ -1158,17 +1158,21 @@ function toggleWishMap(n){S.wishlist=S.wishlist||{};if(S.wishlist[n])delete S.wi
 function toggleWishItin(n,el){S.wishlist=S.wishlist||{};if(S.wishlist[n])delete S.wishlist[n];else S.wishlist[n]=true;save();
   if(el){el.textContent=S.wishlist[n]?'★':'☆';el.classList.toggle('on',!!S.wishlist[n]);}
   if(mapInited){if(spotMarkers[n])refreshSpotMarker(n,false);buildMapCtrl();if(mapWishOnly)applySpotFilter();}}
-let mapWishOnly=false,mapCategory='all';
+let mapWishOnly=false,mapCategories=new Set(),mapFiltersOpen=false;
 const MAP_CATEGORIES=[{id:'all',label:'Tout afficher'},{id:'restaurants',label:'🍜 Restaurants'},{id:'temples',label:'🛕 Temples et sanctuaires'},{id:'culture',label:'🏛️ Musées et monuments'},{id:'nature',label:'⛰️ Nature et grottes'},{id:'beaches',label:'🏖️ Plages et îles'},{id:'markets',label:'🛍️ Marchés'},{id:'other',label:'📍 Autres lieux'},{id:'cities',label:'🔢 Villes et parcours'}];
 function mapSpotCategory(r,n){if(r.resto)return 'restaurants';const em=spotEmoji(n);if(em==='🛕')return 'temples';if(['🏛️','🏯','🧱','🗿','🌉'].includes(em))return 'culture';if(['⛰️','💧','🕳️','🏞️','🌳','🛶'].includes(em))return 'nature';if(['🏖️','🏝️'].includes(em))return 'beaches';if(em==='🛍️')return 'markets';return 'other';}
-function mapSpotMatches(n){const r=spotMarkers[n];return !!r&&(!mapWishOnly||isWished(n))&&(mapCategory==='all'||mapSpotCategory(r,n)===mapCategory);}
-function updateSpotsVis(){if(!map||!spotsLayer)return;const showSpots=mapCategory!=='cities'&&(mapWishOnly||mapCategory!=='all'||map.getZoom()>=6);if(showSpots){if(!map.hasLayer(spotsLayer))map.addLayer(spotsLayer);}else if(map.hasLayer(spotsLayer))map.removeLayer(spotsLayer);const showRoute=!mapWishOnly&&(mapCategory==='all'||mapCategory==='cities');[citiesLayer,routeLayer].forEach(layer=>{if(!layer)return;if(showRoute){if(!map.hasLayer(layer))map.addLayer(layer);}else if(map.hasLayer(layer))map.removeLayer(layer);});}
+function mapSpotMatches(n){const r=spotMarkers[n];return !!r&&(!mapWishOnly||isWished(n))&&mapCategories.has(mapSpotCategory(r,n));}
+function updateSpotsVis(){if(!map||!spotsLayer)return;const showSpots=MAP_CATEGORIES.some(c=>c.id!=='all'&&c.id!=='cities'&&mapCategories.has(c.id));if(showSpots){if(!map.hasLayer(spotsLayer))map.addLayer(spotsLayer);}else if(map.hasLayer(spotsLayer))map.removeLayer(spotsLayer);const showRoute=!mapWishOnly&&mapCategories.has('cities');[citiesLayer,routeLayer].forEach(layer=>{if(!layer)return;if(showRoute){if(!map.hasLayer(layer))map.addLayer(layer);}else if(map.hasLayer(layer))map.removeLayer(layer);});}
 function applySpotFilter(){if(!spotsLayer)return;spotsLayer.clearLayers();Object.keys(spotMarkers).forEach(n=>{if(mapSpotMatches(n))spotsLayer.addLayer(spotMarkers[n].marker);});updateSpotsVis();}
-function setMapCategory(id){if(!MAP_CATEGORIES.some(c=>c.id===id))return;mapCategory=id;try{localStorage.setItem('td_map_category_'+TRIP,id);}catch(e){}applySpotFilter();buildMapCtrl();if(!['all','cities'].includes(id)&&!Object.keys(spotMarkers).some(mapSpotMatches))toast('Aucun lieu géolocalisé dans ce filtre.');}
-function toggleWishFilter(){mapWishOnly=!mapWishOnly;if(mapWishOnly&&mapCategory==='cities')setMapCategory('all');applySpotFilter();buildMapCtrl();
+function toggleMapCategory(id,checked){if(!MAP_CATEGORIES.some(c=>c.id===id))return;if(id==='all')mapCategories=new Set(checked?MAP_CATEGORIES.filter(c=>c.id!=='all').map(c=>c.id):[]);else if(checked)mapCategories.add(id);else mapCategories.delete(id);try{localStorage.setItem('td_map_categories_'+TRIP,JSON.stringify([...mapCategories]));}catch(e){}applySpotFilter();buildMapCtrl();}
+function toggleMapFilters(){mapFiltersOpen=!mapFiltersOpen;buildMapCtrl();}
+function toggleWishFilter(){mapWishOnly=!mapWishOnly;applySpotFilter();buildMapCtrl();
   if(mapWishOnly&&map){const pts=Object.keys(spotMarkers).filter(mapSpotMatches).map(n=>spotMarkers[n].marker.getLatLng());if(pts.length)map.fitBounds(L.latLngBounds(pts),{padding:[40,40],maxZoom:12});}}
-function buildMapCtrl(){const el=document.getElementById('mapctrl');if(!el)return;const cnt=Object.keys(S.wishlist||{}).length;
-  el.innerHTML=`<select id="map-category" aria-label="Catégorie de lieux sur la carte" onchange="setMapCategory(this.value)" style="width:auto;max-width:210px;padding:9px;background:var(--card);box-shadow:var(--sh);font-size:13px">${MAP_CATEGORIES.map(c=>`<option value="${c.id}" ${mapCategory===c.id?'selected':''}>${c.label}</option>`).join('')}</select><button class="chip" style="box-shadow:0 2px 8px rgba(0,0,0,.28)" onclick="openWishlist()">⭐ À voir (${cnt})</button><button class="chip ${mapWishOnly?'on':''}" style="box-shadow:0 2px 8px rgba(0,0,0,.28)" onclick="toggleWishFilter()">${mapWishOnly?'⭐ Favoris seulement ✔':'⭐ Favoris seulement'}</button><button class="chip" onclick="toggleMapSize()">${document.getElementById('mapwrap').classList.contains('map-expanded')?'↙ Réduire':'⛶ Agrandir'}</button><button class="chip" onclick="showMapRoute()">🌏 Tout le parcours</button>`;}
+function buildMapCtrl(){const el=document.getElementById('mapctrl');if(!el)return;const scroll=el.querySelector('#map-filter-panel')?.scrollTop||0;const cnt=Object.keys(S.wishlist||{}).length;
+  const all=MAP_CATEGORIES.filter(c=>c.id!=='all').every(c=>mapCategories.has(c.id));
+  el.innerHTML=`<button class="chip" aria-expanded="${mapFiltersOpen}" aria-controls="map-filter-panel" onclick="toggleMapFilters()">☰ Catégories ${mapFiltersOpen?'▴':'▾'}</button>${mapFiltersOpen?`<div id="map-filter-panel" style="width:220px;max-width:calc(100vw - 100px);max-height:min(330px,45vh);overflow-y:auto;overscroll-behavior:contain;background:var(--card);box-shadow:var(--sh);border-radius:14px;padding:6px" aria-label="Catégories à afficher">${MAP_CATEGORIES.map(c=>`<label style="display:flex;align-items:center;gap:10px;padding:10px 8px;cursor:pointer;font-size:13px"><input type="checkbox" style="width:18px;height:18px;flex-shrink:0" ${c.id==='all'?(all?'checked':''):(mapCategories.has(c.id)?'checked':'')} onchange="toggleMapCategory('${c.id}',this.checked)"><span>${c.label}</span></label>`).join('')}</div>`:''}<button class="chip" onclick="openWishlist()">⭐ À voir (${cnt})</button><button class="chip ${mapWishOnly?'on':''}" onclick="toggleWishFilter()">${mapWishOnly?'⭐ Favoris seulement ✔':'⭐ Favoris seulement'}</button><button class="chip" onclick="toggleMapSize()">${document.getElementById('mapwrap').classList.contains('map-expanded')?'↙ Réduire':'⛶ Agrandir'}</button><button class="chip" onclick="showMapRoute()">🌏 Tout le parcours</button>`;
+  const allBox=el.querySelector('#map-filter-panel input');if(allBox)allBox.indeterminate=!all&&mapCategories.size>0;
+  const panel=el.querySelector('#map-filter-panel');if(panel)panel.scrollTop=scroll;if(panel&&window.L){L.DomEvent.disableClickPropagation(panel);L.DomEvent.disableScrollPropagation(panel);}}
 function toggleMapSize(){const el=document.getElementById('mapwrap');el.classList.toggle('map-expanded');buildMapCtrl();setTimeout(()=>{if(map)map.invalidateSize();el.scrollIntoView({block:'start',behavior:'smooth'});},60);}
 function showMapRoute(){if(map&&mapRouteBounds)map.fitBounds(mapRouteBounds,{padding:[45,45]});}
 function openWishlist(){
@@ -1222,7 +1226,7 @@ function initMap(){
   let lg='<span style="flex-basis:100%;color:var(--muted);font-size:11px">Chiffres = villes (ordre du voyage) · <b>zoome</b> pour voir les lieux (🛕🏖️…) et restos (🍜) · ⭐ = à voir · pointillés = vols</span>';
   BUDGET_PREVU.filter(b=>CFLAG[b.id]).forEach(b=>{lg+=`<span><i style="background:${CFLAG[b.id]}"></i>${b.fl} ${b.nm}</span>`;});
   $('#legend').innerHTML=lg;
-  mapWishOnly=false;try{mapCategory=localStorage.getItem('td_map_category_'+TRIP)||'all';}catch(e){mapCategory='all';}if(!MAP_CATEGORIES.some(c=>c.id===mapCategory))mapCategory='all';applySpotFilter();buildMapCtrl();
+  mapWishOnly=false;mapFiltersOpen=false;const categoryIds=MAP_CATEGORIES.filter(c=>c.id!=='all').map(c=>c.id);try{const saved=JSON.parse(localStorage.getItem('td_map_categories_'+TRIP));mapCategories=new Set(Array.isArray(saved)?saved.filter(id=>categoryIds.includes(id)):categoryIds);}catch(e){mapCategories=new Set(categoryIds);}applySpotFilter();buildMapCtrl();
   map.on('zoomend',updateSpotsVis);
   mapRouteBounds=allPts.length?L.latLngBounds(allPts):null;
   if(mapRouteBounds)map.fitBounds(mapRouteBounds,{padding:[30,30]});
