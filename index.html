@@ -618,7 +618,7 @@ function openSync(){
 /* ============ APPLI INSTALLABLE + NOTIFICATIONS PUSH ============ */
 const VAPID_PUBLIC="BP_AP4FOamPTOp16r_xJ9B-BTE7JzAlRQdm3YyjdXmGidbZVC7wapqCyYOXqzgVOlP1Xlo356c-RHy7BLpqT5Ec";
 let swReg=null,deferredInstall=null;
-const OFFLINE_CACHE='voyages-v14';
+const OFFLINE_CACHE='voyages-v15';
 const OFFLINE_FILES=['./','index.html','manifest.json','vols.html','icon-192.png','icon-512.png','apple-touch-icon.png','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js'];
 async function prepareOffline(){
   const btn=$('#offline-prepare'),status=$('#offline-status');
@@ -642,7 +642,7 @@ function isStandalone(){return window.matchMedia('(display-mode: standalone)').m
 function isiOS(){return /iphone|ipad|ipod/i.test(navigator.userAgent);}
 function pushSupported(){return('serviceWorker'in navigator)&&('PushManager'in window)&&('Notification'in window);}
 function initPWA(){
-  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js?v=20261010-handbook',{updateViaCache:'none'}).then(r=>{swReg=r;r.update().catch(()=>{});}).catch(()=>{});}
+  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js?v=20261010-actions',{updateViaCache:'none'}).then(r=>{swReg=r;r.update().catch(()=>{});}).catch(()=>{});}
   window.addEventListener('beforeinstallprompt',ev=>{ev.preventDefault();deferredInstall=ev;});
   window.addEventListener('offline',()=>setSyncPill('off'));
   window.addEventListener('online',()=>{if(SYNC.user){bootTrips();if(syncActive())pushCloud(true);}fetchRates(true);});
@@ -657,7 +657,7 @@ async function enablePush(){
   if(!pushSupported()){toast('Notifications non supportées sur ce navigateur');return;}
   if(isiOS()&&!isStandalone()){toast("iPhone : ajoute d'abord à l'écran d'accueil, puis rouvre depuis l'icône");return;}
   try{
-    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js?v=20261010-handbook',{updateViaCache:'none'});
+    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js?v=20261010-actions',{updateViaCache:'none'});
     await navigator.serviceWorker.ready;
     const perm=await Notification.requestPermission();
     if(perm!=='granted'){toast('Notifications refusées dans les réglages');return;}
@@ -1040,7 +1040,12 @@ function addSettle(){const amt=parseFloat($('#s-amt').value);if(!amt||amt<=0){to
 function delSettle(id){S.settlements=(S.settlements||[]).filter(x=>x.id!==id);save();renderBudget();}
 
 /* ============ RAPPELS ============ */
-let remTab='ech';
+let remTab='ech',remPeriod='week',remCategory='all',remStage='all';
+const REM_CATEGORIES=[['all','Toutes les catégories'],['hebergement','🛏️ Hébergements'],['transport','🚆 Transports'],['visites','🎟️ Visites et activités'],['formalites','🛂 Formalités'],['preparatifs','🎒 Préparatifs'],['quotidien','☀️ Quotidien'],['budget','💰 Budget'],['general','📌 Autres rappels']];
+function reminderCategory(r){if(r.category)return r.category;const text=r.t+' '+r.s;if(/visa|passeport|frontière|formalités|exemption|tdac|etravel|arrival|droit.*séjour|date limite/i.test(text))return 'formalites';if(/budget/i.test(r.t))return 'budget';if(/hôtel|hébergement/i.test(r.t))return 'hebergement';if(/vol|train|check.in|bateau|ferry/i.test(r.t))return 'transport';if(/sac|médecin|pharmacie|papiers|bagage/i.test(r.t))return 'preparatifs';return 'general';}
+function reminderMatches(r,t){const done=!!S.reminders[r.id],days=dbtw(t,pd(r.date));return (remPeriod==='done'?done:remPeriod==='all'||!done)&&(remPeriod!=='week'||days<=7)&&(remPeriod!=='today'||days<=0)&&(remCategory==='all'||reminderCategory(r)===remCategory)&&(remStage==='all'||r.stage===remStage);}
+function setReminderFilter(key,value){if(key==='period')remPeriod=value;if(key==='category')remCategory=value;if(key==='stage')remStage=value;renderRem();}
+
 let PACK=[];
 let packPerson='marie';
 function personalPack(person){return PACK.filter(g=>(!g.person||g.person===person)&&!(/Spécifique Marie/i.test(g.cat)&&person!=='marie')&&!(/Spécifique Baptiste/i.test(g.cat)&&person!=='baptiste')).map(g=>({...g,items:g.items.map(i=>({...i,id:'packing_'+person+'_'+i.id,t:i.t.replace(/ ×2/g,'').replace(/ ×4 chacun/g,' ×4').replace(/ ?\(chacun\)/g,'').replace(/ de chacun/g,' personnels').replace(/ chacun/g,''),s:i.s?i.s.replace(/ ?\(chacun\)/g,''):i.s}))}));}
@@ -1052,13 +1057,17 @@ function renderRem(){
     <button class="${remTab==='pack'?'on':''}" onclick="setRemTab('pack')">🎒 Bagages</button></div>`;
   html+=handbookHtml('rem');
   if(remTab==='ech'){
-    html+=`<div class="info">🔔 Les rappels marqués <b>notification programmée</b> t'arrivent en <b>notification push</b> sur ton téléphone, même carnet fermé, et se relancent chaque semaine jusqu'à ce que tu répondes « c'est fait ». Ceux-ci s'affichent aussi ici pour t'en souvenir.</div>`;
-    const rems=[...REMINDERS].sort((a,b)=>pd(a.date)-pd(b.date));
+    html+=`<div class="info">✓ Chaque tâche a sa propre case. Les nouveaux rappels détaillés sont affichés dans le carnet ; ils ne sont pas des notifications push programmées. Les notifications existantes demandent un appareil inscrit et les autorisations actives. Les dates de préparation sont des repères, pas des délais officiels de réservation.</div>`;
+    const doneCount=REMINDERS.filter(r=>S.reminders[r.id]).length;
+    html+=`<div class="card tight"><b>${doneCount} / ${REMINDERS.length} tâches cochées</b><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px"><select aria-label="Période des rappels" onchange="setReminderFilter('period',this.value)">${[['week','À faire · 7 prochains jours'],['today','À faire · aujourd’hui et en retard'],['pending','Toutes les tâches à faire'],['all','Tout le séjour'],['done','Tâches cochées']].map(x=>`<option value="${x[0]}" ${remPeriod===x[0]?'selected':''}>${x[1]}</option>`).join('')}</select><select aria-label="Catégorie des rappels" onchange="setReminderFilter('category',this.value)">${REM_CATEGORIES.map(x=>`<option value="${x[0]}" ${remCategory===x[0]?'selected':''}>${x[1]}</option>`).join('')}</select><select aria-label="Pays des rappels" onchange="setReminderFilter('stage',this.value)"><option value="all">Tous les pays</option>${STAGES.map(st=>`<option value="${st.id}" ${remStage===st.id?'selected':''}>${st.fl} ${st.nm}</option>`).join('')}</select></div></div>`;
+    const rems=REMINDERS.filter(r=>reminderMatches(r,t)).sort((a,b)=>pd(a.date)-pd(b.date));
     html+=`<div class="sec-title">Réservations & démarches datées</div>`;
-    rems.forEach(r=>{const w=remWhen(r,t),done=S.reminders[r.id];
+    html+=`<div class="info">${rems.length} tâche(s) dans cette sélection. Pour les actions du matin ou du soir, le moment est indiqué dans leur description ; aucune heure précise de notification n’est programmée.</div>`;
+    if(!rems.length)html+=`<div class="empty">Aucune tâche dans ce filtre. Tu peux changer la période, le pays ou la catégorie.</div>`;
+    let reminderDate='';rems.forEach(r=>{if(r.date!==reminderDate){reminderDate=r.date;html+=`<div class="sec-title">${fdate(r.date)}</div>`;}const w=remWhen(r,t),done=S.reminders[r.id];
       html+=`<div class="rem ${done?'done':''}"><span class="barcol" style="background:${done?'var(--sage)':barByWhen(w.cls)}"></span>
         <div class="cb ${done?'on':''}" onclick="toggleRem('${r.id}')" style="margin-top:1px"></div>
-        <div class="ri"><div class="t">${r.icon} ${r.t}</div><div class="s">${r.s}</div>
+        <div class="ri"><div class="t">${r.icon} ${r.t}</div><div class="s">${r.s}</div>${r.stage?`<button class="chip" style="margin-top:6px" onclick="gotoStage('${r.stage}')">Voir l’itinéraire</button>`:''}
         <span class="when ${w.cls}">${w.label}</span>
         ${r.push?'<div class="bell">🔔 notification push programmée</div>':'<div class="bell" style="color:var(--muted)">🔕 rappel dans l\'app</div>'}</div></div>`;});
     // vols
@@ -1128,7 +1137,7 @@ let notifAsked=false;const notifShown=new Set();
 function askNotif(){if(notifAsked)return;notifAsked=true;
   try{if('Notification'in window&&Notification.permission==='default'){Notification.requestPermission().then(checkDue);}else checkDue();}catch(e){}}
 function checkDue(){try{if(!('Notification'in window)||Notification.permission!=='granted')return;const t=today();
-  REMINDERS.forEach(r=>{if(!S.reminders[r.id]&&pd(r.date)<=t&&!notifShown.has(r.id)){notifShown.add(r.id);
+  REMINDERS.forEach(r=>{if(!r.quiet&&!S.reminders[r.id]&&pd(r.date)<=t&&!notifShown.has(r.id)){notifShown.add(r.id);
     new Notification('Rappel — '+r.t,{body:r.s});}});
   S.flights.forEach(f=>{const dep=new Date(f.date+'T'+(f.time||'00:00')),ci=new Date(dep.getTime()-48*3600e3),k='f'+f.id;
     if(new Date()>=ci&&new Date()<dep&&!notifShown.has(k)){notifShown.add(k);new Notification('Enregistrement ouvert ✈️',{body:f.from+' → '+f.to});}});
