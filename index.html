@@ -617,7 +617,7 @@ function openSync(){
 /* ============ APPLI INSTALLABLE + NOTIFICATIONS PUSH ============ */
 const VAPID_PUBLIC="BP_AP4FOamPTOp16r_xJ9B-BTE7JzAlRQdm3YyjdXmGidbZVC7wapqCyYOXqzgVOlP1Xlo356c-RHy7BLpqT5Ec";
 let swReg=null,deferredInstall=null;
-const OFFLINE_CACHE='voyages-v10';
+const OFFLINE_CACHE='voyages-v11';
 const OFFLINE_FILES=['./','index.html','manifest.json','vols.html','icon-192.png','icon-512.png','apple-touch-icon.png','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js'];
 async function prepareOffline(){
   const btn=$('#offline-prepare'),status=$('#offline-status');
@@ -641,7 +641,7 @@ function isStandalone(){return window.matchMedia('(display-mode: standalone)').m
 function isiOS(){return /iphone|ipad|ipod/i.test(navigator.userAgent);}
 function pushSupported(){return('serviceWorker'in navigator)&&('PushManager'in window)&&('Notification'in window);}
 function initPWA(){
-  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js?v=20261010-mapzoom',{updateViaCache:'none'}).then(r=>{swReg=r;r.update().catch(()=>{});}).catch(()=>{});}
+  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js?v=20261010-favorites',{updateViaCache:'none'}).then(r=>{swReg=r;r.update().catch(()=>{});}).catch(()=>{});}
   window.addEventListener('beforeinstallprompt',ev=>{ev.preventDefault();deferredInstall=ev;});
   window.addEventListener('offline',()=>setSyncPill('off'));
   window.addEventListener('online',()=>{if(SYNC.user){bootTrips();if(syncActive())pushCloud(true);}fetchRates(true);});
@@ -656,7 +656,7 @@ async function enablePush(){
   if(!pushSupported()){toast('Notifications non supportées sur ce navigateur');return;}
   if(isiOS()&&!isStandalone()){toast("iPhone : ajoute d'abord à l'écran d'accueil, puis rouvre depuis l'icône");return;}
   try{
-    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js?v=20261010-mapzoom',{updateViaCache:'none'});
+    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js?v=20261010-favorites',{updateViaCache:'none'});
     await navigator.serviceWorker.ready;
     const perm=await Notification.requestPermission();
     if(perm!=='granted'){toast('Notifications refusées dans les réglages');return;}
@@ -1152,9 +1152,9 @@ function spotPopup(st,b,sp,resto){const on=isWished(sp.n);
     ${sp.p?`<div class="pm">💰 ${sp.p}</div>`:''}
     ${sp.t?`<div style="font-size:12px;color:#555;margin-top:3px">${resto?'🍽️':'💡'} ${sp.t}</div>`:''}
     <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(sp.n+', '+b.c+', '+st.nm)}" target="_blank" rel="noopener" style="font-size:12px;display:inline-block;margin-top:5px">Ouvrir dans Google Maps ↗</a><br>
-    <a href="#" onclick="toggleWishMap('${esc(sp.n)}');return false;" style="font-size:12.5px;font-weight:700;display:inline-block;margin-top:5px;color:${on?'#b0402c':'var(--gold-d)'}">${on?(resto?'✔ Retirer de « à tester »':'✔ Retirer de « à voir »'):(resto?'🍜 Ajouter à « à tester »':'⭐ Ajouter à « à voir »')}</a></div>`;}
+    <a href="#" onclick="toggleWishMap('${esc(sp.n)}');return false;" style="font-size:12.5px;font-weight:700;display:inline-block;margin-top:5px;color:${on?'#b0402c':'var(--gold-d)'}">${on?'✔ Retirer des favoris':'⭐ Ajouter aux favoris'}</a></div>`;}
 function refreshSpotMarker(n,reopen){const r=spotMarkers[n];if(!r)return;r.marker.setIcon(spotIcon(r.col,isWished(n),n,r.resto));r.marker.setPopupContent(spotPopup(r.st,r.b,r.sp,r.resto));if(reopen)r.marker.openPopup();}
-function toggleWishMap(n){S.wishlist=S.wishlist||{};if(S.wishlist[n])delete S.wishlist[n];else S.wishlist[n]=true;save();refreshSpotMarker(n,true);buildMapCtrl();if(mapWishOnly)applySpotFilter();toast(S.wishlist[n]?'⭐ Ajouté à « à voir »':'Retiré de « à voir »');}
+function toggleWishMap(n){S.wishlist=S.wishlist||{};if(S.wishlist[n])delete S.wishlist[n];else S.wishlist[n]=true;save();refreshSpotMarker(n,true);buildMapCtrl();if(mapWishOnly)applySpotFilter();toast(S.wishlist[n]?'⭐ Ajouté aux favoris':'Retiré des favoris');}
 function toggleWishItin(n,el){S.wishlist=S.wishlist||{};if(S.wishlist[n])delete S.wishlist[n];else S.wishlist[n]=true;save();
   if(el){el.textContent=S.wishlist[n]?'★':'☆';el.classList.toggle('on',!!S.wishlist[n]);}
   if(mapInited){if(spotMarkers[n])refreshSpotMarker(n,false);buildMapCtrl();if(mapWishOnly)applySpotFilter();}}
@@ -1170,21 +1170,21 @@ function toggleWishFilter(){mapWishOnly=!mapWishOnly;applySpotFilter();buildMapC
   if(mapWishOnly&&map){const pts=Object.keys(spotMarkers).filter(mapSpotMatches).map(n=>spotMarkers[n].marker.getLatLng());if(pts.length)map.fitBounds(L.latLngBounds(pts),{padding:[40,40],maxZoom:12});}}
 function buildMapCtrl(){const el=document.getElementById('mapctrl');if(!el)return;const scroll=el.querySelector('#map-filter-panel')?.scrollTop||0;const cnt=Object.keys(S.wishlist||{}).length;
   const all=MAP_CATEGORIES.filter(c=>c.id!=='all').every(c=>mapCategories.has(c.id));
-  el.innerHTML=`<button class="chip" aria-expanded="${mapFiltersOpen}" aria-controls="map-filter-panel" onclick="toggleMapFilters()">☰ Catégories ${mapFiltersOpen?'▴':'▾'}</button>${mapFiltersOpen?`<div id="map-filter-panel" style="width:220px;max-width:calc(100vw - 100px);max-height:min(330px,45vh);overflow-y:auto;overscroll-behavior:contain;background:var(--card);box-shadow:var(--sh);border-radius:14px;padding:6px" aria-label="Catégories à afficher">${MAP_CATEGORIES.map(c=>`<label style="display:flex;align-items:center;gap:10px;padding:10px 8px;cursor:pointer;font-size:13px"><input type="checkbox" style="width:18px;height:18px;flex-shrink:0" ${c.id==='all'?(all?'checked':''):(mapCategories.has(c.id)?'checked':'')} onchange="toggleMapCategory('${c.id}',this.checked)"><span>${c.label}</span></label>`).join('')}</div>`:''}<button class="chip" onclick="openWishlist()">⭐ À voir (${cnt})</button><button class="chip ${mapWishOnly?'on':''}" onclick="toggleWishFilter()">${mapWishOnly?'⭐ Favoris seulement ✔':'⭐ Favoris seulement'}</button><button class="chip" onclick="toggleMapSize()">${document.getElementById('mapwrap').classList.contains('map-expanded')?'↙ Réduire':'⛶ Agrandir'}</button><button class="chip" onclick="showMapRoute()">🌏 Tout le parcours</button>`;
+  el.innerHTML=`<button class="chip" aria-expanded="${mapFiltersOpen}" aria-controls="map-filter-panel" onclick="toggleMapFilters()">☰ Catégories ${mapFiltersOpen?'▴':'▾'}</button>${mapFiltersOpen?`<div id="map-filter-panel" style="width:220px;max-width:calc(100vw - 100px);max-height:min(330px,45vh);overflow-y:auto;overscroll-behavior:contain;background:var(--card);box-shadow:var(--sh);border-radius:14px;padding:6px" aria-label="Catégories à afficher">${MAP_CATEGORIES.map(c=>`<label style="display:flex;align-items:center;gap:10px;padding:10px 8px;cursor:pointer;font-size:13px"><input type="checkbox" style="width:18px;height:18px;flex-shrink:0" ${c.id==='all'?(all?'checked':''):(mapCategories.has(c.id)?'checked':'')} onchange="toggleMapCategory('${c.id}',this.checked)"><span>${c.label}</span></label>`).join('')}</div>`:''}<button class="chip" onclick="openWishlist()">⭐ Favoris (${cnt})</button><button class="chip ${mapWishOnly?'on':''}" onclick="toggleWishFilter()">${mapWishOnly?'⭐ Favoris seulement ✔':'⭐ Favoris seulement'}</button><button class="chip" onclick="toggleMapSize()">${document.getElementById('mapwrap').classList.contains('map-expanded')?'↙ Réduire':'⛶ Agrandir'}</button><button class="chip" onclick="showMapRoute()">🌏 Tout le parcours</button>`;
   const allBox=el.querySelector('#map-filter-panel input');if(allBox)allBox.indeterminate=!all&&mapCategories.size>0;
   const panel=el.querySelector('#map-filter-panel');if(panel)panel.scrollTop=scroll;if(panel&&window.L){L.DomEvent.disableClickPropagation(panel);L.DomEvent.disableScrollPropagation(panel);}}
 function toggleMapSize(){const el=document.getElementById('mapwrap');el.classList.toggle('map-expanded');buildMapCtrl();setTimeout(()=>{if(map)map.invalidateSize();el.scrollIntoView({block:'start',behavior:'smooth'});},60);}
 function showMapRoute(){if(map&&mapRouteBounds)map.fitBounds(mapRouteBounds,{padding:[45,45]});}
 function openWishlist(){
   const w=S.wishlist||{};const total=Object.keys(w).length;const shown={};let body='';
-  if(!total)body=`<div class="empty">Aucun lieu en « à voir ».<br>Touche l'étoile ☆ sur un lieu (carte ou itinéraire) pour l'ajouter.</div>`;
+  if(!total)body=`<div class="empty">Aucun favori pour le moment.<br>Touche l'étoile ☆ sur un lieu (carte ou itinéraire) pour l'ajouter.</div>`;
   else STAGES.forEach(st=>{const rows=[];st.blocks.forEach(b=>{[].concat(b.spots||[],b.resto||[]).forEach(sp=>{const n=(typeof sp==='string')?sp:sp.n;if(!w[n]||shown[n])return;shown[n]=1;
     rows.push(`<div class="ck-item" style="margin-bottom:7px"><div class="ci"><div class="t">${n}</div>${(sp&&sp.p)?`<div class="s">💰 ${sp.p}</div>`:''}${(sp&&sp.t)?`<div class="s">💡 ${sp.t}</div>`:''}</div>
       <a class="mapl" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(n+', '+b.c+', '+st.nm)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">📍</a>
       <button class="del" style="color:#e8b64a;font-size:16px" onclick="wishRemove('${esc(n)}')">★</button></div>`);});});
     if(rows.length)body+=`<div class="ck-when">${st.fl} ${st.nm}</div>`+rows.join('');});
   $('#modal').innerHTML=`<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="sheet">
-    <div class="grabber"></div><h3>⭐ Mes lieux à voir (${total})</h3>${body}
+    <div class="grabber"></div><h3>⭐ Mes favoris (${total})</h3>${body}
     <button class="btn ghost" onclick="closeModal()">Fermer</button></div></div>`;
 }
 function wishRemove(n){if(S.wishlist)delete S.wishlist[n];save();if(mapInited){refreshSpotMarker(n,false);buildMapCtrl();applySpotFilter();}renderItin();openWishlist();}
@@ -1223,7 +1223,7 @@ function initMap(){
     if(prevEnd&&pts.length)L.polyline([prevEnd,pts[0]],{color:'#9a9084',weight:1.6,opacity:.55,dashArray:'2 7'}).addTo(routeLayer);
     if(pts.length)prevEnd=pts[pts.length-1];
   });
-  let lg='<span style="flex-basis:100%;color:var(--muted);font-size:11px">Chiffres = villes (ordre du voyage) · <b>zoome</b> pour voir les lieux (🛕🏖️…) et restos (🍜) · ⭐ = à voir · pointillés = vols</span>';
+  let lg='<span style="flex-basis:100%;color:var(--muted);font-size:11px">Chiffres = villes (ordre du voyage) · <b>zoome</b> pour voir les lieux (🛕🏖️…) et restos (🍜) · ⭐ = favori · pointillés = vols</span>';
   BUDGET_PREVU.filter(b=>CFLAG[b.id]).forEach(b=>{lg+=`<span><i style="background:${CFLAG[b.id]}"></i>${b.fl} ${b.nm}</span>`;});
   $('#legend').innerHTML=lg;
   mapWishOnly=false;mapFiltersOpen=false;const categoryIds=MAP_CATEGORIES.filter(c=>c.id!=='all').map(c=>c.id);try{const saved=JSON.parse(localStorage.getItem('td_map_categories_'+TRIP));mapCategories=new Set(Array.isArray(saved)?saved.filter(id=>categoryIds.includes(id)):categoryIds);}catch(e){mapCategories=new Set(categoryIds);}applySpotFilter();buildMapCtrl();
