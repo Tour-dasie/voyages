@@ -1,7 +1,7 @@
 /* Service worker — Tour d'Asie
    1) Notifications push (appli fermée)
    2) Mode hors-ligne : met en cache l'appli + ses ressources pour consulter sans réseau */
-const CACHE = 'voyages-v5';
+const CACHE = 'voyages-v6';
 
 /* Ressources internes (même domaine) */
 const CORE = [
@@ -21,7 +21,7 @@ const CDN = [
 self.addEventListener('install', e => {
   e.waitUntil((async () => {
     const c = await caches.open(CACHE);
-    try { await c.addAll(CORE); } catch (err) {}
+    try { await c.addAll(CORE.map(u => new Request(u, {cache:'reload'}))); } catch (err) {}
     // les CDN en "best effort" (réponses opaques, on ignore les échecs)
     await Promise.all(CDN.map(u => fetch(u, { mode: 'no-cors' }).then(r => c.put(u, r)).catch(() => {})));
     self.skipWaiting();
@@ -44,6 +44,9 @@ self.addEventListener('fetch', e => {
 
   /* Appels réseau Firebase (auth + base de données) : toujours le réseau, jamais le cache */
   const h = url.hostname;
+  // Les tuiles utilisent le cache HTTP du navigateur. Ne pas garder durablement
+  // une image d'erreur du fournisseur dans le cache hors-ligne de l'application.
+  if(h === 'tile.openstreetmap.org' || h.endsWith('.basemaps.cartocdn.com'))return;
   if (h.indexOf('googleapis.com') >= 0 || h.indexOf('firebaseio.com') >= 0 ||
       h.indexOf('firebasedatabase.app') >= 0 || h.indexOf('identitytoolkit') >= 0 ||
       h.indexOf('securetoken') >= 0 || h.indexOf('google-analytics') >= 0 ||
@@ -54,7 +57,7 @@ self.addEventListener('fetch', e => {
   /* Page (navigation) : réseau d'abord (pour avoir les mises à jour), sinon cache */
   if (req.mode === 'navigate') {
     e.respondWith(
-      fetch(req).then(r => {
+      fetch(new Request(req, {cache:'no-store'})).then(r => {
         const copy = r.clone();
         caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
         return r;

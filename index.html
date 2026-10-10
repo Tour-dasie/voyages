@@ -615,7 +615,7 @@ function isStandalone(){return window.matchMedia('(display-mode: standalone)').m
 function isiOS(){return /iphone|ipad|ipod/i.test(navigator.userAgent);}
 function pushSupported(){return('serviceWorker'in navigator)&&('PushManager'in window)&&('Notification'in window);}
 function initPWA(){
-  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js').then(r=>{swReg=r;}).catch(()=>{});}
+  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js?v=20261010-map2',{updateViaCache:'none'}).then(r=>{swReg=r;r.update().catch(()=>{});}).catch(()=>{});}
   window.addEventListener('beforeinstallprompt',ev=>{ev.preventDefault();deferredInstall=ev;});
   window.addEventListener('offline',()=>setSyncPill('off'));
   window.addEventListener('online',()=>{if(syncActive())setSyncPill('connecting');fetchRates(true);});
@@ -630,7 +630,7 @@ async function enablePush(){
   if(!pushSupported()){toast('Notifications non supportées sur ce navigateur');return;}
   if(isiOS()&&!isStandalone()){toast("iPhone : ajoute d'abord à l'écran d'accueil, puis rouvre depuis l'icône");return;}
   try{
-    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js');
+    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js?v=20261010-map2',{updateViaCache:'none'});
     await navigator.serviceWorker.ready;
     const perm=await Notification.requestPermission();
     if(perm!=='granted'){toast('Notifications refusées dans les réglages');return;}
@@ -1161,8 +1161,6 @@ function initMap(){
   map=L.map('map',{zoomControl:true,attributionControl:true,maxZoom:19}).setView([16,105],4);
   const osmAttribution='&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>';
   const streets=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,maxNativeZoom:19,attribution:osmAttribution}).addTo(map);
-  const light=L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:19,maxNativeZoom:19,subdomains:'abcd',attribution:osmAttribution+' &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>'});
-  L.control.layers({'Rues et détails':streets,'Fond clair':light},null,{position:'bottomleft'}).addTo(map);
   L.control.scale({imperial:false,position:'bottomleft'}).addTo(map);
   const t=today();let curStage=null;for(const st of STAGES){if(t>=pd(st.start)&&t<pd(st.end)){curStage=st;break;}}
   const allPts=[];let idx=0;let prevEnd=null;
