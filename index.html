@@ -631,7 +631,6 @@ async function prepareOffline(){
     localStorage.setItem(dataKey(),JSON.stringify(S));
     if(!localStorage.getItem(contentKey()))throw Error('Planning non sauvegardé');
     localStorage.setItem('td_trips',JSON.stringify(TRIPS));localStorage.setItem('td_offline_'+TRIP,String(Date.now()));
-    if(navigator.storage&&navigator.storage.persist)await navigator.storage.persist().catch(()=>false);
     if(status)status.textContent='✅ Carnet prêt sur cet appareil. Tu peux tester en mode avion.';toast('✓ Carnet préparé pour le hors ligne');
   }catch(e){if(status)status.textContent='Préparation incomplète : reconnecte-toi et réessaie.';toast('Préparation hors ligne incomplète');}
   finally{if(btn)btn.disabled=false;}
