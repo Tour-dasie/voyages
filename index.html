@@ -405,7 +405,7 @@ let CHECK=[];
 
 /* ============ ÉTAT ============ */
 const KEY="tourdasie_v2";
-let TRIP=localStorage.getItem('td_trip')||'asie';
+let TRIP=new URLSearchParams(location.search).get('trip')==='asie'?'asie':localStorage.getItem('td_trip')||'asie';
 let TRIPS={};
 function dataKey(){return KEY+'_'+TRIP;}
 function contentKey(){return 'tdcontent_'+TRIP;}
@@ -545,6 +545,7 @@ function startSync(){
     SYNC.ref=SYNC.db.ref('voyages/'+TRIP);
     SYNC.dataRef=SYNC.ref.child('data');
     SYNC.pushRef=SYNC.db.ref('push');
+    refreshPushDevice().catch(()=>{});
     SYNC.first=true;
     SYNC.dataRef.on('value',snap=>{
       const remote=snap.val();
@@ -605,7 +606,11 @@ function openSync(){
     <div class="grabber"></div><h3>☁️ Mon carnet partagé</h3>
     <div class="info" style="background:linear-gradient(135deg,#e3f0e0,#f6ede2)">✅ <b>Connecté</b> — <b>${SYNC.user.email}</b>. Tout ce que toi ou l'autre modifiez se synchronise en direct sur les deux téléphones.</div>
     ${isiOS()&&!isStandalone()?`<div class="info" style="margin-bottom:10px">📱 <b>iPhone</b> : ouvre le menu <b>Partager</b> ⬆️ puis « <b>Sur l'écran d'accueil</b> », et rouvre le carnet depuis l'icône <b>avant</b> d'activer les notifications (exigence d'Apple).</div>`:''}
-    <button class="btn" onclick="enablePush()">🔔 Activer les notifications ici</button>
+    <label class="fl-l">Qui utilise ce téléphone ?</label><select id="push-owner"><option value="marie" ${meAsPayer()==='marie'?'selected':''}>Marie</option><option value="baptiste" ${meAsPayer()==='baptiste'?'selected':''}>Baptiste</option></select>
+    <div class="info">Les heures suivent le pays prévu dans votre itinéraire : matin 8 h, dépenses 20 h, préparation du soir 21 h, autres tâches 9 h. Si vous changez le parcours, les dates et fuseaux doivent être ajustés. Une connexion est nécessaire pour recevoir les notifications.</div>
+    <div id="push-service-status" class="info">Vérification du service d’envoi…</div>
+    <button class="btn" onclick="enablePush()">🔔 Inscrire ce téléphone aux rappels</button>
+    <button class="btn ghost" onclick="testServerPush()">📨 Tester une notification site fermé</button>
     <button class="btn ghost" onclick="installApp()">📲 Installer sur l'écran d'accueil</button>
     <div class="info">📴 Hors ligne : itinéraire, infos, rappels et budget du voyage sauvegardé. Les nouvelles dépenses restent sur cet appareil puis se synchronisent au retour du réseau. Le fond de carte et les liens externes nécessitent Internet. Ne te déconnecte pas avant le voyage.</div>
     <div id="offline-status" style="font-size:13px;margin:8px 0">${localStorage.getItem('td_offline_'+TRIP)?'Dernière préparation : '+new Date(Number(localStorage.getItem('td_offline_'+TRIP))).toLocaleString('fr-FR'):'Prépare le carnet sur cet appareil avant de partir.'}</div>
@@ -613,12 +618,13 @@ function openSync(){
     <button class="btn ghost" onclick="closeModal()">Fermer</button>
     <button class="btn ghost" style="color:var(--red);margin-top:8px" onclick="doLogout()">Se déconnecter</button>
   </div></div>`;
+  updatePushServiceStatus();
 }
 
 /* ============ APPLI INSTALLABLE + NOTIFICATIONS PUSH ============ */
 const VAPID_PUBLIC="BP_AP4FOamPTOp16r_xJ9B-BTE7JzAlRQdm3YyjdXmGidbZVC7wapqCyYOXqzgVOlP1Xlo356c-RHy7BLpqT5Ec";
 let swReg=null,deferredInstall=null;
-const OFFLINE_CACHE='voyages-v15';
+const OFFLINE_CACHE='voyages-v16';
 const OFFLINE_FILES=['./','index.html','manifest.json','vols.html','icon-192.png','icon-512.png','apple-touch-icon.png','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js'];
 async function prepareOffline(){
   const btn=$('#offline-prepare'),status=$('#offline-status');
@@ -642,7 +648,7 @@ function isStandalone(){return window.matchMedia('(display-mode: standalone)').m
 function isiOS(){return /iphone|ipad|ipod/i.test(navigator.userAgent);}
 function pushSupported(){return('serviceWorker'in navigator)&&('PushManager'in window)&&('Notification'in window);}
 function initPWA(){
-  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js?v=20261010-actions',{updateViaCache:'none'}).then(r=>{swReg=r;r.update().catch(()=>{});}).catch(()=>{});}
+  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js?v=20261010-push',{updateViaCache:'none'}).then(r=>{swReg=r;r.update().catch(()=>{});}).catch(()=>{});}
   window.addEventListener('beforeinstallprompt',ev=>{ev.preventDefault();deferredInstall=ev;});
   window.addEventListener('offline',()=>setSyncPill('off'));
   window.addEventListener('online',()=>{if(SYNC.user){bootTrips();if(syncActive())pushCloud(true);}fetchRates(true);});
@@ -654,10 +660,10 @@ function installApp(){
 }
 async function enablePush(){
   if(!syncActive()){toast("Active d'abord la synchro ☁️ (les notifs en dépendent)");return;}
-  if(!pushSupported()){toast('Notifications non supportées sur ce navigateur');return;}
   if(isiOS()&&!isStandalone()){toast("iPhone : ajoute d'abord à l'écran d'accueil, puis rouvre depuis l'icône");return;}
+  if(!pushSupported()){toast('Notifications non supportées sur ce navigateur');return;}
   try{
-    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js?v=20261010-actions',{updateViaCache:'none'});
+    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js?v=20261010-push',{updateViaCache:'none'});
     await navigator.serviceWorker.ready;
     const perm=await Notification.requestPermission();
     if(perm!=='granted'){toast('Notifications refusées dans les réglages');return;}
@@ -665,11 +671,16 @@ async function enablePush(){
     if(!sub)sub=await swReg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64ToU8(VAPID_PUBLIC)});
     const j=sub.toJSON();
     const key=(j.keys&&j.keys.auth?j.keys.auth:('s'+Date.now())).replace(/[.#$\[\]\/]/g,'_');
-    if(SYNC.pushRef)await SYNC.pushRef.child(key).set({endpoint:j.endpoint,keys:j.keys,at:Date.now(),ua:navigator.userAgent.slice(0,120)});
-    swReg.showNotification("Carnet de voyage",{body:'✅ Notifications activées sur cet appareil !',icon:'icon-192.png',badge:'icon-192.png'});
-    toast('🔔 Notifications activées');closeModal();
+    if(!SYNC.pushRef)throw Error('Synchronisation indisponible');await SYNC.pushRef.child(key).update({endpoint:j.endpoint,keys:j.keys,at:Date.now(),ua:navigator.userAgent.slice(0,120),uid:SYNC.user.uid,owner:$('#push-owner')?.value||meAsPayer(),timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,followItinerary:true,trips:[TRIP],disabled:false});await SYNC.ref.child('notificationSettings').update({enabled:true,mode:'individual',requestedAt:Date.now()});
+    await swReg.showNotification("Appareil inscrit — Tour d’Asie",{body:'Ce message confirme l’inscription de l’appareil. Utilise le test serveur pour vérifier la réception site fermé.',icon:'icon-192.png',badge:'icon-192.png'});
+    toast('Appareil inscrit ; vérifie le service et lance le test.');updatePushServiceStatus();
   }catch(e){toast('Échec notifs : '+(e&&e.message?e.message:e));}
 }
+
+async function currentPushDevice(){if(!('serviceWorker'in navigator)||!('PushManager'in window))return null;const reg=await navigator.serviceWorker.ready;const sub=await reg.pushManager.getSubscription();if(!sub)return null;const j=sub.toJSON();const key=j.keys?.auth?.replace(/[.#$\[\]\/]/g,'_');return key?{key,ref:SYNC.pushRef?.child(key)}:null;}
+async function refreshPushDevice(){if(!SYNC.pushRef||!('Notification'in window)||Notification.permission!=='granted')return;const device=await currentPushDevice();if(device?.ref)await device.ref.update({timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,lastSeenAt:Date.now()});}
+async function updatePushServiceStatus(){const el=$('#push-service-status');if(!el||!SYNC.ref)return;try{const service=(await SYNC.ref.child('notificationService').once('value')).val();const fresh=service?.status==='active'&&Date.now()-service.lastRunAt<3600000;el.textContent=fresh?'✅ Service d’envoi actif. Inscris chaque téléphone puis lance le test site fermé.':'⏳ Envoi automatique non confirmé : le service serveur reste à connecter ou à vérifier. Inscrire le téléphone seul ne programme pas les envois.';}catch(e){el.textContent='Impossible de vérifier le service d’envoi pour le moment.';}}
+async function testServerPush(){try{if(!SYNC.ref)throw Error('Connecte-toi d’abord');const service=(await SYNC.ref.child('notificationService').once('value')).val();if(service?.status!=='active'||Date.now()-service.lastRunAt>3600000){toast('Le service serveur doit être activé avant le test.');return;}const device=await currentPushDevice();if(!device?.ref){toast('Inscris ce téléphone aux notifications d’abord.');return;}await device.ref.update({testRequestedAt:Date.now()});toast('Test demandé : ferme le carnet. Envoi au prochain passage, sous 15 minutes.');}catch(e){toast('Test impossible : '+e.message);}}
 
 /* ============ HELPERS ============ */
 const $=(s,r=document)=>r.querySelector(s);
@@ -1057,7 +1068,8 @@ function renderRem(){
     <button class="${remTab==='pack'?'on':''}" onclick="setRemTab('pack')">🎒 Bagages</button></div>`;
   html+=handbookHtml('rem');
   if(remTab==='ech'){
-    html+=`<div class="info">✓ Chaque tâche a sa propre case. Les nouveaux rappels détaillés sont affichés dans le carnet ; ils ne sont pas des notifications push programmées. Les notifications existantes demandent un appareil inscrit et les autorisations actives. Les dates de préparation sont des repères, pas des délais officiels de réservation.</div>`;
+    html+=`<button class="btn" onclick="openSync()">🔔 Notifications sur mon téléphone</button>`;
+    html+=`<div class="info">✓ Chaque tâche a sa propre case. Pour recevoir chaque tâche site fermé : inscrire le téléphone, autoriser les notifications et vérifier le service d’envoi avec le test. Tant que le serveur n’est pas confirmé actif, les nouveaux envois ne sont pas programmés. Les dates de préparation sont des repères, pas des délais officiels de réservation.</div>`;
     const doneCount=REMINDERS.filter(r=>S.reminders[r.id]).length;
     html+=`<div class="card tight"><b>${doneCount} / ${REMINDERS.length} tâches cochées</b><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px"><select aria-label="Période des rappels" onchange="setReminderFilter('period',this.value)">${[['week','À faire · 7 prochains jours'],['today','À faire · aujourd’hui et en retard'],['pending','Toutes les tâches à faire'],['all','Tout le séjour'],['done','Tâches cochées']].map(x=>`<option value="${x[0]}" ${remPeriod===x[0]?'selected':''}>${x[1]}</option>`).join('')}</select><select aria-label="Catégorie des rappels" onchange="setReminderFilter('category',this.value)">${REM_CATEGORIES.map(x=>`<option value="${x[0]}" ${remCategory===x[0]?'selected':''}>${x[1]}</option>`).join('')}</select><select aria-label="Pays des rappels" onchange="setReminderFilter('stage',this.value)"><option value="all">Tous les pays</option>${STAGES.map(st=>`<option value="${st.id}" ${remStage===st.id?'selected':''}>${st.fl} ${st.nm}</option>`).join('')}</select></div></div>`;
     const rems=REMINDERS.filter(r=>reminderMatches(r,t)).sort((a,b)=>pd(a.date)-pd(b.date));
@@ -1065,7 +1077,7 @@ function renderRem(){
     html+=`<div class="info">${rems.length} tâche(s) dans cette sélection. Pour les actions du matin ou du soir, le moment est indiqué dans leur description ; aucune heure précise de notification n’est programmée.</div>`;
     if(!rems.length)html+=`<div class="empty">Aucune tâche dans ce filtre. Tu peux changer la période, le pays ou la catégorie.</div>`;
     let reminderDate='';rems.forEach(r=>{if(r.date!==reminderDate){reminderDate=r.date;html+=`<div class="sec-title">${fdate(r.date)}</div>`;}const w=remWhen(r,t),done=S.reminders[r.id];
-      html+=`<div class="rem ${done?'done':''}"><span class="barcol" style="background:${done?'var(--sage)':barByWhen(w.cls)}"></span>
+      html+=`<div id="rem-${cssId(r.id)}" class="rem ${done?'done':''}"><span class="barcol" style="background:${done?'var(--sage)':barByWhen(w.cls)}"></span>
         <div class="cb ${done?'on':''}" onclick="toggleRem('${r.id}')" style="margin-top:1px"></div>
         <div class="ri"><div class="t">${r.icon} ${r.t}</div><div class="s">${r.s}</div>${r.stage?`<button class="chip" style="margin-top:6px" onclick="gotoStage('${r.stage}')">Voir l’itinéraire</button>`:''}
         <span class="when ${w.cls}">${w.label}</span>
@@ -1354,7 +1366,9 @@ function renderGuide(){
   if(HANDBOOK.sources?.length)html+=handbookPanel('🔎 Sources et informations à revalider',[["Mise à jour",HANDBOOK.updated||''],...HANDBOOK.sources.map(x=>[x[0],`<a href="${x[1]}" target="_blank" rel="noopener">Ouvrir la source officielle</a>`])]);
   el.innerHTML=html;
 }
-function renderAll(){renderToday();renderItin();renderBudget();renderRem();renderGuide();}
+let reminderLinkOpened=false;
+function openReminderLink(){const params=new URLSearchParams(location.search),id=params.get('reminder');if(reminderLinkOpened||!id||!REMINDERS.some(r=>r.id===id))return;if(params.get('trip')&&params.get('trip')!==TRIP)return;reminderLinkOpened=true;remTab='ech';remPeriod='all';remCategory='all';remStage='all';renderRem();nav('rem');setTimeout(()=>document.getElementById('rem-'+cssId(id))?.scrollIntoView({block:'center'}),150);}
+function renderAll(){renderToday();renderItin();renderBudget();renderRem();renderGuide();setTimeout(openReminderLink,100);}
 /* le carnet reste verrouillé (body.locked) et vide tant que la connexion n'est pas validée ;
    renderAll()+nav() sont déclenchés par initFirebase() une fois l'utilisateur authentifié */
 initPWA();initFirebase();fetchRates();

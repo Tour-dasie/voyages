@@ -1,7 +1,7 @@
 /* Service worker — Tour d'Asie
    1) Notifications push (appli fermée)
    2) Mode hors-ligne : met en cache l'appli + ses ressources pour consulter sans réseau */
-const CACHE = 'voyages-v15';
+const CACHE = 'voyages-v16';
 
 /* Ressources internes (même domaine) */
 const CORE = [
@@ -101,7 +101,7 @@ self.addEventListener('notificationclick', e => {
   const url = (e.notification.data && e.notification.data.url) || './';
   e.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
-      for (const c of list) { if ('focus' in c) return c.focus(); }
+      for (const c of list) { if (new URL(c.url).origin===self.location.origin && c.url.includes('/voyages/') && 'focus' in c) {return c.navigate(url).then(()=>c.focus());} }
       if (self.clients.openWindow) return self.clients.openWindow(url);
     })
   );

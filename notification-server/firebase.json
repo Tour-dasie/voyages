@@ -1,0 +1,1 @@
+{"functions":[{"source":"functions","codebase":"trip-notifications","runtime":"nodejs22","ignore":["node_modules","*.test.js",".env*",".git"]}]}
