@@ -617,7 +617,7 @@ function openSync(){
 /* ============ APPLI INSTALLABLE + NOTIFICATIONS PUSH ============ */
 const VAPID_PUBLIC="BP_AP4FOamPTOp16r_xJ9B-BTE7JzAlRQdm3YyjdXmGidbZVC7wapqCyYOXqzgVOlP1Xlo356c-RHy7BLpqT5Ec";
 let swReg=null,deferredInstall=null;
-const OFFLINE_CACHE='voyages-v11';
+const OFFLINE_CACHE='voyages-v12';
 const OFFLINE_FILES=['./','index.html','manifest.json','vols.html','icon-192.png','icon-512.png','apple-touch-icon.png','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js'];
 async function prepareOffline(){
   const btn=$('#offline-prepare'),status=$('#offline-status');
@@ -641,7 +641,7 @@ function isStandalone(){return window.matchMedia('(display-mode: standalone)').m
 function isiOS(){return /iphone|ipad|ipod/i.test(navigator.userAgent);}
 function pushSupported(){return('serviceWorker'in navigator)&&('PushManager'in window)&&('Notification'in window);}
 function initPWA(){
-  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js?v=20261010-favorites',{updateViaCache:'none'}).then(r=>{swReg=r;r.update().catch(()=>{});}).catch(()=>{});}
+  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js?v=20261010-bags',{updateViaCache:'none'}).then(r=>{swReg=r;r.update().catch(()=>{});}).catch(()=>{});}
   window.addEventListener('beforeinstallprompt',ev=>{ev.preventDefault();deferredInstall=ev;});
   window.addEventListener('offline',()=>setSyncPill('off'));
   window.addEventListener('online',()=>{if(SYNC.user){bootTrips();if(syncActive())pushCloud(true);}fetchRates(true);});
@@ -656,7 +656,7 @@ async function enablePush(){
   if(!pushSupported()){toast('Notifications non supportées sur ce navigateur');return;}
   if(isiOS()&&!isStandalone()){toast("iPhone : ajoute d'abord à l'écran d'accueil, puis rouvre depuis l'icône");return;}
   try{
-    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js?v=20261010-favorites',{updateViaCache:'none'});
+    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js?v=20261010-bags',{updateViaCache:'none'});
     await navigator.serviceWorker.ready;
     const perm=await Notification.requestPermission();
     if(perm!=='granted'){toast('Notifications refusées dans les réglages');return;}
@@ -1035,11 +1035,14 @@ function delSettle(id){S.settlements=(S.settlements||[]).filter(x=>x.id!==id);sa
 /* ============ RAPPELS ============ */
 let remTab='ech';
 let PACK=[];
+let packPerson='marie';
+function personalPack(person){return PACK.filter(g=>!(/Spécifique Marie/i.test(g.cat)&&person!=='marie')&&!(/Spécifique Baptiste/i.test(g.cat)&&person!=='baptiste')).map(g=>({...g,items:g.items.map(i=>({...i,id:'packing_'+person+'_'+i.id,t:i.t.replace(/ ×2/g,'').replace(/ ×4 chacun/g,' ×4').replace(/ ?\(chacun\)/g,'').replace(/ de chacun/g,' personnels').replace(/ chacun/g,''),s:i.s?i.s.replace(/ ?\(chacun\)/g,''):i.s}))}));}
+function setPackPerson(person){if(!['marie','baptiste'].includes(person))return;packPerson=person;renderRem();}
 function renderRem(){
   const t=today();
   let html=`<div class="seg"><button class="${remTab==='ech'?'on':''}" onclick="setRemTab('ech')">🔔 Échéances</button>
     <button class="${remTab==='prep'?'on':''}" onclick="setRemTab('prep')">🧳 Préparatifs</button>
-    <button class="${remTab==='pack'?'on':''}" onclick="setRemTab('pack')">🎒 Bagage</button></div>`;
+    <button class="${remTab==='pack'?'on':''}" onclick="setRemTab('pack')">🎒 Bagages</button></div>`;
   if(remTab==='ech'){
     html+=`<div class="info">🔔 Les rappels marqués <b>notification programmée</b> t'arrivent en <b>notification push</b> sur ton téléphone, même carnet fermé, et se relancent chaque semaine jusqu'à ce que tu répondes « c'est fait ». Ceux-ci s'affichent aussi ici pour t'en souvenir.</div>`;
     const rems=[...REMINDERS].sort((a,b)=>pd(a.date)-pd(b.date));
@@ -1075,12 +1078,15 @@ function renderRem(){
         html+=`<div class="ck-item ${d?'done':''}" onclick="toggleCheck('${i.id}')"><div class="cb big ${d?'on':''}"></div>
           <div class="ci"><div class="t">${i.t}</div>${i.s?`<div class="s">${i.s}</div>`:''}</div></div>`;});});
   } else {
-    const pall=PACK.reduce((a,g)=>a+g.items.length,0),pdone=PACK.reduce((a,g)=>a+g.items.filter(i=>S.check[i.id]).length,0);
-    html+=`<div class="lhero"><span class="badge">Bagage</span><div class="big">${pdone}<small> / ${pall} affaires</small></div>
+    const list=personalPack(packPerson),name=packPerson==='marie'?'Marie':'Baptiste';
+    const pall=list.reduce((a,g)=>a+g.items.length,0),pdone=list.reduce((a,g)=>a+g.items.filter(i=>S.check[i.id]).length,0);
+    html+=`<div class="seg" aria-label="Choisir le sac à préparer"><button class="${packPerson==='marie'?'on':''}" onclick="setPackPerson('marie')">👩 Sac de Marie</button><button class="${packPerson==='baptiste'?'on':''}" onclick="setPackPerson('baptiste')">👨 Sac de Baptiste</button></div>`;
+    html+=`<div class="lhero"><span class="badge">Sac de ${name}</span><div class="big">${pdone}<small> / ${pall} affaires</small></div>
       <div class="pbar"><i style="width:${pall?Math.round(pdone/pall*100):0}%"></i></div>
       <div class="pmeta"><span>${pall?Math.round(pdone/pall*100):0}% dans le sac</span><span>${pall-pdone} restantes</span></div></div>`;
-    html+=`<div class="info">🎒 Liste pour 2 (👩 Marie + 👨 Baptiste) — coche au fur et à mesure. Pense aux couches (chaud/froid) et à l'imperméable selon les étapes.</div>`;
-    PACK.forEach(g=>{html+=`<div class="ck-when">▹ ${g.cat}</div>`;
+    html+=`<div class="info">🎒 ${name}, coche les affaires que tu as mises dans ton sac. Chaque personne a sa propre liste et sa progression. Pour le matériel partagé, coche uniquement dans le sac qui le transporte.</div>`;
+    if(PACK.some(g=>g.items.some(i=>S.check[i.id])))html+=`<div class="info">Les anciennes validations de la liste commune sont conservées. Confirme ici les affaires présentes dans chaque sac.</div>`;
+    list.forEach(g=>{html+=`<div class="ck-when">▹ ${g.cat}</div>`;
       g.items.forEach(i=>{const d=S.check[i.id];
         html+=`<div class="ck-item ${d?'done':''}" onclick="toggleCheck('${i.id}')"><div class="cb big ${d?'on':''}"></div>
           <div class="ci"><div class="t">${i.t}</div>${i.s?`<div class="s">${i.s}</div>`:''}</div></div>`;});});
