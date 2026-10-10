@@ -1,7 +1,7 @@
 /* Service worker — Tour d'Asie
    1) Notifications push (appli fermée)
    2) Mode hors-ligne : met en cache l'appli + ses ressources pour consulter sans réseau */
-const CACHE = 'voyages-v3';
+const CACHE = 'voyages-v4';
 
 /* Ressources internes (même domaine) */
 const CORE = [
