@@ -627,7 +627,7 @@ async function prepareOffline(){
   try{
     await navigator.serviceWorker.ready;
     const cache=await caches.open(OFFLINE_CACHE);
-    await Promise.all(OFFLINE_FILES.map(async url=>{const request=new Request(new URL(url,location.href).href,{cache:'reload'});const response=await fetch(request);if(!response.ok)throw Error('Téléchargement incomplet');await cache.put(request,response);}));
+    await Promise.all(OFFLINE_FILES.map(async url=>{const target=new URL(url,location.href);const request=new Request(target.href,{cache:'reload',mode:target.origin===location.origin?'same-origin':'no-cors'});const response=await fetch(request);if(!response.ok&&response.type!=='opaque')throw Error('Téléchargement incomplet');await cache.put(request,response);}));
     localStorage.setItem(dataKey(),JSON.stringify(S));
     if(!localStorage.getItem(contentKey()))throw Error('Planning non sauvegardé');
     localStorage.setItem('td_trips',JSON.stringify(TRIPS));localStorage.setItem('td_offline_'+TRIP,String(Date.now()));
