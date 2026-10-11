@@ -1,7 +1,5 @@
-<!doctype html><html lang="fr"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Programme Tour d’Asie à copier</title><style>body{font:18px system-ui;max-width:850px;margin:24px auto;padding:16px}button{padding:16px;background:#0868bd;color:white;border:0;border-radius:12px;font:inherit}textarea{display:block;box-sizing:border-box;width:100%;height:55vh;margin-top:20px;font:12px monospace}#status{min-height:2em}</style><h1>Programme Cloudflare</h1><p>Appuie sur <b>Copier tout le programme</b>, puis retourne dans Cloudflare, sélectionne tout le contenu de <b>worker.js</b> et remplace-le par ce programme. Appuie ensuite sur <b>Déployer</b>.</p><p>Le programme s’installe avec les envois désactivés. Il restera à connecter le stockage, les clés de notification et vérifier la sécurité avant activation.</p><button id="copy">Copier tout le programme</button><p id="status" role="status"></p><textarea id="code" readonly spellcheck="false">/* Tour d’Asie — Worker Cloudflare, 11 octobre 2026.
-Fichier autonome : remplacer tout worker.js par ce texte.
-Aucun mot de passe à écrire dans ce fichier. Les secrets restent dans Cloudflare.
-INSTALLATION SEULE : aucun envoi tant que configuration et revue de sécurité ne sont pas terminées.
+<!doctype html><html lang="fr"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Programme Tour d’Asie à copier</title><style>body{font:18px system-ui;max-width:850px;margin:24px auto;padding:16px}button{padding:16px;background:#0868bd;color:white;border:0;border-radius:12px;font:inherit}textarea{display:block;box-sizing:border-box;width:100%;height:55vh;margin-top:20px;font:12px monospace}#status{min-height:2em}</style><h1>Programme Cloudflare</h1><p>Appuie sur <b>Copier tout le programme</b>, puis retourne dans Cloudflare, sélectionne tout le contenu de <b>worker.js</b> et remplace-le par ce programme. Appuie ensuite sur <b>Déployer</b>.</p><p>Le programme s’installe avec les envois désactivés. Il restera à connecter le stockage, les clés de notification et vérifier la sécurité avant activation.</p><button id="copy">Copier tout le programme</button><p id="status" role="status"></p><textarea id="code" readonly spellcheck="false">/* Tour d’Asie — Cloudflare. Secrets fournis uniquement par env.
+Envois désactivés tant que les deux drapeaux de configuration ne sont pas validés.
 Inclut @block65/webcrypto-web-push 2.0.0 :
 Copyright 2024 Block65 Pte Ltd
 
@@ -585,12 +583,10 @@ var worker_default = {
     }
   }
 };
+
+// deploy-entry.mjs
+var deploy_entry_default = worker_default;
 export {
-  worker_default as default,
-  dispatch,
-  firebaseSession,
-  prerequisites,
-  publicStatus,
-  subscriptionAllowed
+  deploy_entry_default as default
 };
 </textarea><script>document.getElementById('copy').onclick=async()=>{const el=document.getElementById('code');try{await navigator.clipboard.writeText(el.value);document.getElementById('status').textContent='Programme copié. Retourne dans Cloudflare pour le coller.';}catch{el.focus();el.select();el.setSelectionRange(0,el.value.length);const ok=document.execCommand('copy');document.getElementById('status').textContent=ok?'Programme copié.':'Le texte est sélectionné : appuie sur Copier.';}};</script></html>

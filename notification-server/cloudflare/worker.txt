@@ -1,7 +1,5 @@
-/* Tour d’Asie — Worker Cloudflare, 11 octobre 2026.
-Fichier autonome : remplacer tout worker.js par ce texte.
-Aucun mot de passe à écrire dans ce fichier. Les secrets restent dans Cloudflare.
-INSTALLATION SEULE : aucun envoi tant que configuration et revue de sécurité ne sont pas terminées.
+/* Tour d’Asie — Cloudflare. Secrets fournis uniquement par env.
+Envois désactivés tant que les deux drapeaux de configuration ne sont pas validés.
 Inclut @block65/webcrypto-web-push 2.0.0 :
 Copyright 2024 Block65 Pte Ltd
 
@@ -585,11 +583,9 @@ var worker_default = {
     }
   }
 };
+
+// deploy-entry.mjs
+var deploy_entry_default = worker_default;
 export {
-  worker_default as default,
-  dispatch,
-  firebaseSession,
-  prerequisites,
-  publicStatus,
-  subscriptionAllowed
+  deploy_entry_default as default
 };
