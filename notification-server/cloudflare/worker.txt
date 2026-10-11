@@ -1,6 +1,4 @@
-/* Tour d’Asie — Cloudflare. Secrets fournis uniquement par env.
-Envois désactivés tant que les deux drapeaux de configuration ne sont pas validés.
-Inclut @block65/webcrypto-web-push 2.0.0 :
+/*
 Copyright 2024 Block65 Pte Ltd
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -52,8 +50,15 @@ var require_planner = __commonJS({
   "../site-source/notification-server/functions/planner.js"(exports, module) {
     "use strict";
     var ZONES = { cn: "Asia/Shanghai", jp: "Asia/Tokyo", th: "Asia/Bangkok", kh: "Asia/Phnom_Penh", vn: "Asia/Ho_Chi_Minh", la: "Asia/Vientiane", pi: "Asia/Manila" };
+    var formatters = /* @__PURE__ */ new Map();
     function localClock(now, zone) {
-      const parts = new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" }).formatToParts(now);
+      let formatter = formatters.get(zone);
+      if (!formatter) {
+        formatter = new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" });
+        if (formatters.size > 20) formatters.clear();
+        formatters.set(zone, formatter);
+      }
+      const parts = formatter.formatToParts(now);
       const p = Object.fromEntries(parts.map((x) => [x.type, x.value]));
       return { date: `${p.year}-${p.month}-${p.day}`, hour: Number(p.hour) };
     }
@@ -428,9 +433,9 @@ function prerequisites(env) {
 function jsonResponse(value, status = 200) {
   return new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'" } });
 }
-async function publicStatus(request) {
+async function publicStatus(request, env = {}) {
   if (request.method !== "GET" && request.method !== "HEAD") return jsonResponse({ message: "M\xE9thode non autoris\xE9e" }, 405);
-  const response = jsonResponse({ service: "Tour d\u2019Asie \u2014 rappels", programme: "install\xE9", message: "Le programme est install\xE9. Les envois n\xE9cessitent la configuration priv\xE9e, un d\xE9clencheur et la validation de s\xE9curit\xE9. Cette page ne d\xE9clenche aucun envoi." });
+  const response = jsonResponse({ service: "Tour d\u2019Asie \u2014 rappels", programme: "install\xE9", serviceActive: env.NOTIFICATIONS_ENABLED === "true" && env.SECURITY_REVIEW_APPROVED === "true", message: "Le programme est install\xE9. Les envois n\xE9cessitent la configuration priv\xE9e, un d\xE9clencheur et la validation de s\xE9curit\xE9. Cette page ne d\xE9clenche aucun envoi." });
   return request.method === "HEAD" ? new Response(null, { status: response.status, headers: response.headers }) : response;
 }
 async function limitedJSON(response) {
@@ -463,7 +468,9 @@ async function timedFetch(fetcher, url, options = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 15e3);
   try {
-    return await fetcher(url, { ...options, redirect: "error", signal: controller.signal });
+    const response = await fetcher.call(globalThis, url, { ...options, redirect: "manual", signal: controller.signal });
+    if (response.status >= 300 && response.status < 400) throw Error("REDIRECT_REFUSED");
+    return response;
   } finally {
     clearTimeout(timer);
   }
@@ -531,17 +538,20 @@ async function dispatch(env, now = /* @__PURE__ */ new Date(), deps = {}) {
   const db = deps.db || await firebaseSession(env, deps.fetcher || fetch);
   const settings = await db.read(`voyages/${TRIP}/notificationSettings`);
   if (settings?.enabled !== true) return { status: "disabled", accepted: 0 };
-  const content = await contentCache(env, db, now.getTime());
   const devices = await db.read("push");
   const candidates = Object.entries(devices || {}).filter(([key, d]) => PATH.test(key) && subscriptionAllowed(d, env.VAPID_PUBLIC_KEY)).slice(0, 5);
-  if (!candidates.length) return { status: "devices_not_registered", accepted: 0 };
+  if (!candidates.length) {
+    await db.write(`voyages/${TRIP}/notificationService`, { status: "active", lastRunAt: now.getTime(), accepted: 0, failed: 0, registeredDevices: 0, needsRegistration: true, provider: "cloudflare", cadenceMinutes: 15 });
+    return { status: "devices_not_registered", accepted: 0 };
+  }
+  const content = await contentCache(env, db, now.getTime());
   let accepted = 0, failed = 0, state;
   const send = deps.send || (async (device, payload) => {
     const request = await buildPushPayload({ data: JSON.stringify(payload), options: { ttl: 21600, urgency: "normal" } }, device, { subject: "https://tour-dasie.github.io/voyages/", publicKey: env.VAPID_PUBLIC_KEY, privateKey: env.VAPID_PRIVATE_KEY });
     return timedFetch(deps.fetcher || fetch, device.endpoint, request);
   });
   for (const [key, device] of candidates) {
-    const logs = await db.read(`notificationDelivery/${TRIP}/${key}`) || {};
+    const logs = await db.read(`voyages/${TRIP}/notificationDelivery/${key}`) || {};
     const due = dueReminders(content, { reminders: {} }, device, now).filter((r) => !logs[r.id]?.sentAt && !logs[r.id]?.cancelledAt);
     const testAt = device.testRequestedAt;
     if (testAt && testAt > (device.testSentAt || 0) && now.getTime() - testAt < 36e5 && Number.isSafeInteger(testAt)) due.unshift({ id: `test_${testAt}`, test: true, t: "Test serveur \u2014 Tour d\u2019Asie", s: "Cette notification vient du service Cloudflare. Elle peut arriver carnet ferm\xE9." });
@@ -551,7 +561,7 @@ async function dispatch(env, now = /* @__PURE__ */ new Date(), deps = {}) {
         if (!state) state = stateValue(await db.read(`voyages/${TRIP}/data/blob`));
         if (state.reminders[reminder.id]) continue;
       }
-      const logPath = `notificationDelivery/${TRIP}/${key}/${reminder.id}`;
+      const logPath = `voyages/${TRIP}/notificationDelivery/${key}/${reminder.id}`;
       if (!await db.claim(logPath, now.getTime())) continue;
       try {
         const response = await send(device, notificationPayload(reminder, TRIP));
@@ -568,7 +578,7 @@ async function dispatch(env, now = /* @__PURE__ */ new Date(), deps = {}) {
       }
     }
   }
-  await db.write(`voyages/${TRIP}/notificationService`, { status: "active", lastRunAt: now.getTime(), accepted, failed, mode: "individual", provider: "cloudflare", cadenceMinutes: 15 });
+  await db.write(`voyages/${TRIP}/notificationService`, { status: "active", lastRunAt: now.getTime(), accepted, failed, registeredDevices: candidates.length, needsRegistration: false, mode: "individual", provider: "cloudflare", cadenceMinutes: 15 });
   return { status: "ran", accepted, failed };
 }
 var worker_default = {

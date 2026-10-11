@@ -1,6 +1,4 @@
-<!doctype html><html lang="fr"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Programme Tour d’Asie à copier</title><style>body{font:18px system-ui;max-width:850px;margin:24px auto;padding:16px}button{padding:16px;background:#0868bd;color:white;border:0;border-radius:12px;font:inherit}textarea{display:block;box-sizing:border-box;width:100%;height:55vh;margin-top:20px;font:12px monospace}#status{min-height:2em}</style><h1>Programme Cloudflare</h1><p>Appuie sur <b>Copier tout le programme</b>, puis retourne dans Cloudflare, sélectionne tout le contenu de <b>worker.js</b> et remplace-le par ce programme. Appuie ensuite sur <b>Déployer</b>.</p><p>Le programme s’installe avec les envois désactivés. Il restera à connecter le stockage, les clés de notification et vérifier la sécurité avant activation.</p><button id="copy">Copier tout le programme</button><p id="status" role="status"></p><textarea id="code" readonly spellcheck="false">/* Tour d’Asie — Cloudflare. Secrets fournis uniquement par env.
-Envois désactivés tant que les deux drapeaux de configuration ne sont pas validés.
-Inclut @block65/webcrypto-web-push 2.0.0 :
+<!doctype html><html lang="fr"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Programme Tour d’Asie à copier</title><style>body{font:18px system-ui;max-width:850px;margin:24px auto;padding:16px}button{padding:16px;background:#0868bd;color:white;border:0;border-radius:12px;font:inherit}textarea{display:block;box-sizing:border-box;width:100%;height:55vh;margin-top:20px;font:12px monospace}#status{min-height:2em}</style><h1>Programme Cloudflare</h1><p>Appuie sur <b>Copier tout le programme</b>, puis retourne dans Cloudflare, sélectionne tout le contenu de <b>worker.js</b> et remplace-le par ce programme. Appuie ensuite sur <b>Déployer</b>.</p><p>Le programme s’installe avec les envois désactivés. Il restera à connecter le stockage, les clés de notification et vérifier la sécurité avant activation.</p><button id="copy">Copier tout le programme</button><p id="status" role="status"></p><textarea id="code" readonly spellcheck="false">/*
 Copyright 2024 Block65 Pte Ltd
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -52,8 +50,15 @@ var require_planner = __commonJS({
   &quot;../site-source/notification-server/functions/planner.js&quot;(exports, module) {
     &quot;use strict&quot;;
     var ZONES = { cn: &quot;Asia/Shanghai&quot;, jp: &quot;Asia/Tokyo&quot;, th: &quot;Asia/Bangkok&quot;, kh: &quot;Asia/Phnom_Penh&quot;, vn: &quot;Asia/Ho_Chi_Minh&quot;, la: &quot;Asia/Vientiane&quot;, pi: &quot;Asia/Manila&quot; };
+    var formatters = /* @__PURE__ */ new Map();
     function localClock(now, zone) {
-      const parts = new Intl.DateTimeFormat(&quot;en-CA&quot;, { timeZone: zone, year: &quot;numeric&quot;, month: &quot;2-digit&quot;, day: &quot;2-digit&quot;, hour: &quot;2-digit&quot;, hourCycle: &quot;h23&quot; }).formatToParts(now);
+      let formatter = formatters.get(zone);
+      if (!formatter) {
+        formatter = new Intl.DateTimeFormat(&quot;en-CA&quot;, { timeZone: zone, year: &quot;numeric&quot;, month: &quot;2-digit&quot;, day: &quot;2-digit&quot;, hour: &quot;2-digit&quot;, hourCycle: &quot;h23&quot; });
+        if (formatters.size &gt; 20) formatters.clear();
+        formatters.set(zone, formatter);
+      }
+      const parts = formatter.formatToParts(now);
       const p = Object.fromEntries(parts.map((x) =&gt; [x.type, x.value]));
       return { date: `${p.year}-${p.month}-${p.day}`, hour: Number(p.hour) };
     }
@@ -428,9 +433,9 @@ function prerequisites(env) {
 function jsonResponse(value, status = 200) {
   return new Response(JSON.stringify(value), { status, headers: { &quot;Content-Type&quot;: &quot;application/json; charset=utf-8&quot;, &quot;Cache-Control&quot;: &quot;no-store&quot;, &quot;X-Content-Type-Options&quot;: &quot;nosniff&quot;, &quot;Referrer-Policy&quot;: &quot;no-referrer&quot;, &quot;Content-Security-Policy&quot;: &quot;default-src &#x27;none&#x27;; frame-ancestors &#x27;none&#x27;&quot; } });
 }
-async function publicStatus(request) {
+async function publicStatus(request, env = {}) {
   if (request.method !== &quot;GET&quot; &amp;&amp; request.method !== &quot;HEAD&quot;) return jsonResponse({ message: &quot;M\xE9thode non autoris\xE9e&quot; }, 405);
-  const response = jsonResponse({ service: &quot;Tour d\u2019Asie \u2014 rappels&quot;, programme: &quot;install\xE9&quot;, message: &quot;Le programme est install\xE9. Les envois n\xE9cessitent la configuration priv\xE9e, un d\xE9clencheur et la validation de s\xE9curit\xE9. Cette page ne d\xE9clenche aucun envoi.&quot; });
+  const response = jsonResponse({ service: &quot;Tour d\u2019Asie \u2014 rappels&quot;, programme: &quot;install\xE9&quot;, serviceActive: env.NOTIFICATIONS_ENABLED === &quot;true&quot; &amp;&amp; env.SECURITY_REVIEW_APPROVED === &quot;true&quot;, message: &quot;Le programme est install\xE9. Les envois n\xE9cessitent la configuration priv\xE9e, un d\xE9clencheur et la validation de s\xE9curit\xE9. Cette page ne d\xE9clenche aucun envoi.&quot; });
   return request.method === &quot;HEAD&quot; ? new Response(null, { status: response.status, headers: response.headers }) : response;
 }
 async function limitedJSON(response) {
@@ -463,7 +468,9 @@ async function timedFetch(fetcher, url, options = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() =&gt; controller.abort(), 15e3);
   try {
-    return await fetcher(url, { ...options, redirect: &quot;error&quot;, signal: controller.signal });
+    const response = await fetcher.call(globalThis, url, { ...options, redirect: &quot;manual&quot;, signal: controller.signal });
+    if (response.status &gt;= 300 &amp;&amp; response.status &lt; 400) throw Error(&quot;REDIRECT_REFUSED&quot;);
+    return response;
   } finally {
     clearTimeout(timer);
   }
@@ -531,17 +538,20 @@ async function dispatch(env, now = /* @__PURE__ */ new Date(), deps = {}) {
   const db = deps.db || await firebaseSession(env, deps.fetcher || fetch);
   const settings = await db.read(`voyages/${TRIP}/notificationSettings`);
   if (settings?.enabled !== true) return { status: &quot;disabled&quot;, accepted: 0 };
-  const content = await contentCache(env, db, now.getTime());
   const devices = await db.read(&quot;push&quot;);
   const candidates = Object.entries(devices || {}).filter(([key, d]) =&gt; PATH.test(key) &amp;&amp; subscriptionAllowed(d, env.VAPID_PUBLIC_KEY)).slice(0, 5);
-  if (!candidates.length) return { status: &quot;devices_not_registered&quot;, accepted: 0 };
+  if (!candidates.length) {
+    await db.write(`voyages/${TRIP}/notificationService`, { status: &quot;active&quot;, lastRunAt: now.getTime(), accepted: 0, failed: 0, registeredDevices: 0, needsRegistration: true, provider: &quot;cloudflare&quot;, cadenceMinutes: 15 });
+    return { status: &quot;devices_not_registered&quot;, accepted: 0 };
+  }
+  const content = await contentCache(env, db, now.getTime());
   let accepted = 0, failed = 0, state;
   const send = deps.send || (async (device, payload) =&gt; {
     const request = await buildPushPayload({ data: JSON.stringify(payload), options: { ttl: 21600, urgency: &quot;normal&quot; } }, device, { subject: &quot;https://tour-dasie.github.io/voyages/&quot;, publicKey: env.VAPID_PUBLIC_KEY, privateKey: env.VAPID_PRIVATE_KEY });
     return timedFetch(deps.fetcher || fetch, device.endpoint, request);
   });
   for (const [key, device] of candidates) {
-    const logs = await db.read(`notificationDelivery/${TRIP}/${key}`) || {};
+    const logs = await db.read(`voyages/${TRIP}/notificationDelivery/${key}`) || {};
     const due = dueReminders(content, { reminders: {} }, device, now).filter((r) =&gt; !logs[r.id]?.sentAt &amp;&amp; !logs[r.id]?.cancelledAt);
     const testAt = device.testRequestedAt;
     if (testAt &amp;&amp; testAt &gt; (device.testSentAt || 0) &amp;&amp; now.getTime() - testAt &lt; 36e5 &amp;&amp; Number.isSafeInteger(testAt)) due.unshift({ id: `test_${testAt}`, test: true, t: &quot;Test serveur \u2014 Tour d\u2019Asie&quot;, s: &quot;Cette notification vient du service Cloudflare. Elle peut arriver carnet ferm\xE9.&quot; });
@@ -551,7 +561,7 @@ async function dispatch(env, now = /* @__PURE__ */ new Date(), deps = {}) {
         if (!state) state = stateValue(await db.read(`voyages/${TRIP}/data/blob`));
         if (state.reminders[reminder.id]) continue;
       }
-      const logPath = `notificationDelivery/${TRIP}/${key}/${reminder.id}`;
+      const logPath = `voyages/${TRIP}/notificationDelivery/${key}/${reminder.id}`;
       if (!await db.claim(logPath, now.getTime())) continue;
       try {
         const response = await send(device, notificationPayload(reminder, TRIP));
@@ -568,7 +578,7 @@ async function dispatch(env, now = /* @__PURE__ */ new Date(), deps = {}) {
       }
     }
   }
-  await db.write(`voyages/${TRIP}/notificationService`, { status: &quot;active&quot;, lastRunAt: now.getTime(), accepted, failed, mode: &quot;individual&quot;, provider: &quot;cloudflare&quot;, cadenceMinutes: 15 });
+  await db.write(`voyages/${TRIP}/notificationService`, { status: &quot;active&quot;, lastRunAt: now.getTime(), accepted, failed, registeredDevices: candidates.length, needsRegistration: false, mode: &quot;individual&quot;, provider: &quot;cloudflare&quot;, cadenceMinutes: 15 });
   return { status: &quot;ran&quot;, accepted, failed };
 }
 var worker_default = {

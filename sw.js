@@ -1,12 +1,13 @@
 /* Service worker — Tour d'Asie
    1) Notifications push (appli fermée)
    2) Mode hors-ligne : met en cache l'appli + ses ressources pour consulter sans réseau */
-const CACHE = 'voyages-v16';
+importScripts('security.js');
+const CACHE = 'voyages-v18';
 
 /* Ressources internes (même domaine) */
 const CORE = [
   './', 'index.html', 'manifest.json', 'vols.html',
-  'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'
+  'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'security.js', 'vendor/dompurify-3.4.16.min.js'
 ];
 /* Librairies externes (carte + Firebase) — mises en cache pour marcher hors-ligne */
 const CDN = [
@@ -90,7 +91,7 @@ self.addEventListener('push', e => {
     badge: 'icon-192.png',
     tag: data.tag || 'tourdasie',
     renotify: true,
-    data: { url: data.url || './' },
+    data: { url: TravelSecurity.notificationURL(data.url, self.registration.scope) },
     vibrate: [80, 40, 80]
   };
   e.waitUntil(self.registration.showNotification(title, options));
@@ -98,7 +99,7 @@ self.addEventListener('push', e => {
 
 self.addEventListener('notificationclick', e => {
   e.notification.close();
-  const url = (e.notification.data && e.notification.data.url) || './';
+  const url = TravelSecurity.notificationURL(e.notification.data && e.notification.data.url, self.registration.scope);
   e.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
       for (const c of list) { if (new URL(c.url).origin===self.location.origin && c.url.includes('/voyages/') && 'focus' in c) {return c.navigate(url).then(()=>c.focus());} }

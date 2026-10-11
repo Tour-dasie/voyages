@@ -370,13 +370,15 @@ body.locked header,body.locked main,body.locked .nav,body.locked #fab{display:no
 <div id="modal"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="vendor/dompurify-3.4.16.min.js"></script>
+<script src="security.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 <script>
 /* ============ DONNÉES ============ */
 let TRIP_START="", TRIP_END=""; const TRAVELERS=2;
-const IMG=id=>`https://images.unsplash.com/photo-${id}?w=1000&q=70&auto=format&fit=crop`;
+const IMG=id=>`https://images.unsplash.com/photo-${TravelSecurity.validKey(String(id))?id:''}?w=1000&q=70&auto=format&fit=crop`;
 
 let BUDGET_PREVU=[];
 const CATS=[
@@ -405,7 +407,7 @@ let CHECK=[];
 
 /* ============ ÉTAT ============ */
 const KEY="tourdasie_v2";
-let TRIP=new URLSearchParams(location.search).get('trip')==='asie'?'asie':localStorage.getItem('td_trip')||'asie';
+let TRIP=new URLSearchParams(location.search).get('trip')==='asie'?'asie':(TravelSecurity.validKey(localStorage.getItem('td_trip'))?localStorage.getItem('td_trip'):'asie');
 let TRIPS={};
 function dataKey(){return KEY+'_'+TRIP;}
 function contentKey(){return 'tdcontent_'+TRIP;}
@@ -422,7 +424,7 @@ const FIREBASE_CONFIG={
 const ESPACE="voyage";
 let S={days:{},blocks:{},check:{},expenses:[],reminders:{},flights:[],photos:{},rates:{},wishlist:{},settlements:[]};
 let SYNC={ref:null,dataRef:null,pushRef:null,db:null,applying:false,first:true,user:null,ready:false};
-function load(){S={days:{},blocks:{},check:{},expenses:[],reminders:{},flights:[],photos:{},rates:{},wishlist:{},settlements:[]};try{const r=localStorage.getItem(dataKey());if(r)S=Object.assign(S,JSON.parse(r));}catch(e){}}
+function load(){S={days:{},blocks:{},check:{},expenses:[],reminders:{},flights:[],photos:{},rates:{},wishlist:{},settlements:[]};try{const r=localStorage.getItem(dataKey());if(r)S=Object.assign(S,TravelSecurity.validateState(JSON.parse(r)));}catch(e){}}
 function save(){if(!SYNC.applying)S._updatedAt=Date.now();try{localStorage.setItem(dataKey(),JSON.stringify(S));}catch(e){toast("⚠️ Sauvegarde impossible");}pushCloud();}
 load();
 /* pré-remplissage à partir des confirmations trouvées dans Gmail (une seule fois) */
@@ -460,12 +462,12 @@ function mergeStates(a,b){
   m._seed1=a._seed1||b._seed1;m._updatedAt=Math.max(a._updatedAt||0,b._updatedAt||0);
   return m;
 }
-function lockUI(){document.body.classList.add('locked');['today','itin','budget','rem'].forEach(v=>{const el=document.getElementById('v-'+v);if(el)el.innerHTML='';});}
+function lockUI(){document.body.classList.add('locked');['today','itin','budget','rem','guide'].forEach(v=>{const el=document.getElementById('v-'+v);if(el)el.innerHTML='';});}
 function unlockUI(){document.body.classList.remove('locked');}
 let HANDBOOK={};
 /* ===== Multi-voyages : contenu chargé depuis Firebase (plus dans le code public) ===== */
 function applyContent(str){
-  try{var c=JSON.parse(str);if(!c||!c.STAGES||!c.STAGES.length)return false;
+  try{var c=TravelSecurity.validateContent(JSON.parse(str));if(!c||!c.STAGES||!c.STAGES.length)return false;
     HANDBOOK=c.HANDBOOK||{};STAGES=c.STAGES; SOCIAL=c.SOCIAL||{}; PRATIQUE=c.PRATIQUE||{}; PACK=c.PACK||[];
     RESTO_CO=c.RESTO_CO||{}; SPOT_CO=c.SPOT_CO||{}; REMINDERS=c.REMINDERS||[]; CHECK=c.CHECK||[]; BUDGET_PREVU=c.BUDGET_PREVU||[];
     GALLERY=c.GALLERY||[]; COUNTRY_CUR=c.COUNTRY_CUR||{}; CFLAG=c.CFLAG||{};
@@ -483,13 +485,14 @@ function bootTrips(){
   if(!navigator.onLine){if(!loadedCache)loadTrip(TRIP);return;}
   firebase.database().ref('voyages/_index').once('value').then(function(s){
     var v=s.val()||{}; if(Object.keys(v).length){TRIPS=v;}
-    var ks=Object.keys(TRIPS).filter(function(k){return k[0]!=='_';});
+    var ks=Object.keys(TRIPS).filter(function(k){return TravelSecurity.validKey(k)&&k[0]!=='_';});
     if(!TRIPS[TRIP]&&ks.length){ks.sort(function(a,b){return (TRIPS[a].order||99)-(TRIPS[b].order||99);});TRIP=ks[0];}
     try{localStorage.setItem('td_trips',JSON.stringify(TRIPS));}catch(e){}
     if(!loadedCache)loadTrip(TRIP);else setTripName();
   }).catch(function(){ try{TRIPS=JSON.parse(localStorage.getItem('td_trips')||'{}');}catch(e){TRIPS={};} loadTrip(TRIP); });
 }
 function loadTrip(id){
+  if(!TravelSecurity.validKey(id)){toast('Identifiant de voyage invalide');return;}
   TRIP=id; try{localStorage.setItem('td_trip',TRIP);}catch(e){}
   setTripName(); load(); seedOnce(); stopSync();setSyncPill(navigator.onLine?'connecting':'off'); startSync();
   var hadCache=false;
@@ -510,9 +513,9 @@ function switchTrip(id){
   toast('Voyage : '+((TRIPS[id]||{}).name||id));
 }
 function openTrips(){
-  var ks=Object.keys(TRIPS).filter(function(k){return k[0]!=='_';}).sort(function(a,b){return (TRIPS[a].order||99)-(TRIPS[b].order||99);});
+  var ks=Object.keys(TRIPS).filter(function(k){return TravelSecurity.validKey(k)&&k[0]!=='_';}).sort(function(a,b){return (TRIPS[a].order||99)-(TRIPS[b].order||99);});
   var rows=ks.map(function(id){var m=TRIPS[id]||{};var on=id===TRIP;
-    return '<div class="tripitem'+(on?' on':'')+'" onclick="switchTrip(\''+id+'\')"><span class="te">'+(m.emoji||'🧭')+'</span><div class="ti"><div class="tn">'+(m.name||id)+'</div><div class="td2">'+((m.start||'')+(m.end?(' → '+m.end):''))+'</div></div>'+(on?'<span class="tok">✓</span>':'')+'</div>';
+    return '<div class="tripitem'+(on?' on':'')+'" onclick="switchTrip(\''+esc(id)+'\')"><span class="te">'+htmlText(m.emoji||'🧭')+'</span><div class="ti"><div class="tn">'+htmlText(m.name||id)+'</div><div class="td2">'+htmlText((m.start||'')+(m.end?(' → '+m.end):''))+'</div></div>'+(on?'<span class="tok">✓</span>':'')+'</div>';
   }).join('');
   if(!rows)rows='<p style="color:var(--ink2);font-size:14px">Aucun voyage disponible.</p>';
   $('#modal').innerHTML='<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="sheet"><div class="grabber"></div><h3>🧳 Mes voyages</h3><p style="color:var(--ink2);font-size:13px;margin:0 2px 12px">Choisis le voyage à afficher. Tes données de chaque voyage sont séparées et synchronisées à deux.</p>'+rows+'<button class="btn ghost" style="margin-top:6px" onclick="closeModal()">Fermer</button></div></div>';
@@ -536,6 +539,7 @@ function initFirebase(){
   }catch(e){setSyncPill('err');}
 }
 function stopSync(){
+  clearTimeout(_pushT);
   try{if(SYNC.dataRef)SYNC.dataRef.off();}catch(e){}
   SYNC.ref=null;SYNC.dataRef=null;SYNC.pushRef=null;SYNC.db=null;SYNC.first=true;
 }
@@ -552,7 +556,7 @@ function startSync(){
       if(SYNC.first){
         SYNC.first=false;
         if(remote&&remote.blob){
-          let d=null;try{d=JSON.parse(remote.blob);}catch(e){}
+          let d=null;try{d=TravelSecurity.validateState(JSON.parse(remote.blob));}catch(e){}
           if(d){SYNC.applying=true;applyRemoteData(mergeStates(S,d));SYNC.applying=false;
             try{localStorage.setItem(dataKey(),JSON.stringify(S));}catch(e){}renderAll();}
         }
@@ -560,7 +564,7 @@ function startSync(){
       }
       if(!remote||!remote.blob){setSyncPill('on');return;}
       const rt=remote._updatedAt||0,lt=S._updatedAt||0;
-      if(rt>lt){let d=null;try{d=JSON.parse(remote.blob);}catch(e){return;}
+      if(rt>lt){let d=null;try{d=TravelSecurity.validateState(JSON.parse(remote.blob));}catch(e){return;}
         SYNC.applying=true;applyRemoteData(d);SYNC.applying=false;
         try{localStorage.setItem(dataKey(),JSON.stringify(S));}catch(e){}renderAll();toast('☁️ Carnet synchronisé');}
       setSyncPill('on');
@@ -585,7 +589,7 @@ function doLogin(){
     .then(()=>{toast('Connecté ✓');})
     .catch(e=>{toast(authErr(e));if(btn){btn.textContent='Se connecter';btn.disabled=false;}});
 }
-function doLogout(){if(confirm('Se déconnecter de ce carnet sur cet appareil ?')){firebase.auth().signOut();toast('Déconnecté');}}
+async function doLogout(){if(!confirm('Se déconnecter et effacer le carnet hors ligne de cet appareil ? Les données synchronisées restent dans Firebase.'))return;try{await firebase.auth().signOut();for(const key of Object.keys(localStorage)){if(key===KEY||key.startsWith(KEY+'_')||key.startsWith('tdcontent_')||key.startsWith('td_offline_')||key==='td_trips')localStorage.removeItem(key);}S={days:{},blocks:{},check:{},expenses:[],reminders:{},flights:[],photos:{},rates:{},wishlist:{},settlements:[]};clearContent();TRIPS={};if(typeof map!=='undefined'&&map){map.remove();map=null;mapInited=false;}toast('Déconnecté — carnet local effacé');}catch(e){toast('Déconnexion impossible : réessaie');}}
 function showLogin(){
   if($('#lg-mail'))return;
   $('#modal').innerHTML=`<div class="loginwrap"><div class="loginbox">
@@ -604,7 +608,7 @@ function openSync(){
   if(!SYNC.user){showLogin();return;}
   $('#modal').innerHTML=`<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="sheet">
     <div class="grabber"></div><h3>☁️ Mon carnet partagé</h3>
-    <div class="info" style="background:linear-gradient(135deg,#e3f0e0,#f6ede2)">✅ <b>Connecté</b> — <b>${SYNC.user.email}</b>. Tout ce que toi ou l'autre modifiez se synchronise en direct sur les deux téléphones.</div>
+    <div class="info" style="background:linear-gradient(135deg,#e3f0e0,#f6ede2)">✅ <b>Connecté</b> — <b>${htmlText(SYNC.user.email)}</b>. Tout ce que toi ou l'autre modifiez se synchronise en direct sur les deux téléphones.</div>
     ${isiOS()&&!isStandalone()?`<div class="info" style="margin-bottom:10px">📱 <b>iPhone</b> : ouvre le menu <b>Partager</b> ⬆️ puis « <b>Sur l'écran d'accueil</b> », et rouvre le carnet depuis l'icône <b>avant</b> d'activer les notifications (exigence d'Apple).</div>`:''}
     <label class="fl-l">Qui utilise ce téléphone ?</label><select id="push-owner"><option value="marie" ${meAsPayer()==='marie'?'selected':''}>Marie</option><option value="baptiste" ${meAsPayer()==='baptiste'?'selected':''}>Baptiste</option></select>
     <div class="info">Les heures suivent le pays prévu dans votre itinéraire : matin 8 h, dépenses 20 h, préparation du soir 21 h, autres tâches 9 h. Si vous changez le parcours, les dates et fuseaux doivent être ajustés. Une connexion est nécessaire pour recevoir les notifications.</div>
@@ -622,10 +626,10 @@ function openSync(){
 }
 
 /* ============ APPLI INSTALLABLE + NOTIFICATIONS PUSH ============ */
-const VAPID_PUBLIC="BP_AP4FOamPTOp16r_xJ9B-BTE7JzAlRQdm3YyjdXmGidbZVC7wapqCyYOXqzgVOlP1Xlo356c-RHy7BLpqT5Ec";
+const VAPID_PUBLIC="BJrHrykUoHRgXFQHcJz03DBSvokJG43YUoATcuppRHl4FRBZU8nNlhd-YR6RAj5ckn49YPs17xa81rFj7lLul9s";
 let swReg=null,deferredInstall=null;
-const OFFLINE_CACHE='voyages-v16';
-const OFFLINE_FILES=['./','index.html','manifest.json','vols.html','icon-192.png','icon-512.png','apple-touch-icon.png','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js'];
+const OFFLINE_CACHE='voyages-v18';
+const OFFLINE_FILES=['./','index.html','manifest.json','vols.html','icon-192.png','icon-512.png','apple-touch-icon.png','security.js','vendor/dompurify-3.4.16.min.js','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js'];
 async function prepareOffline(){
   const btn=$('#offline-prepare'),status=$('#offline-status');
   if(!navigator.onLine){toast('Connecte-toi pour télécharger le carnet.');return;}
@@ -648,7 +652,7 @@ function isStandalone(){return window.matchMedia('(display-mode: standalone)').m
 function isiOS(){return /iphone|ipad|ipod/i.test(navigator.userAgent);}
 function pushSupported(){return('serviceWorker'in navigator)&&('PushManager'in window)&&('Notification'in window);}
 function initPWA(){
-  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js?v=20261010-push',{updateViaCache:'none'}).then(r=>{swReg=r;r.update().catch(()=>{});}).catch(()=>{});}
+  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js?v=20261011-launch',{updateViaCache:'none'}).then(r=>{swReg=r;r.update().catch(()=>{});}).catch(()=>{});}
   window.addEventListener('beforeinstallprompt',ev=>{ev.preventDefault();deferredInstall=ev;});
   window.addEventListener('offline',()=>setSyncPill('off'));
   window.addEventListener('online',()=>{if(SYNC.user){bootTrips();if(syncActive())pushCloud(true);}fetchRates(true);});
@@ -663,23 +667,24 @@ async function enablePush(){
   if(isiOS()&&!isStandalone()){toast("iPhone : ajoute d'abord à l'écran d'accueil, puis rouvre depuis l'icône");return;}
   if(!pushSupported()){toast('Notifications non supportées sur ce navigateur');return;}
   try{
-    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js?v=20261010-push',{updateViaCache:'none'});
+    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js?v=20261011-launch',{updateViaCache:'none'});
     await navigator.serviceWorker.ready;
     const perm=await Notification.requestPermission();
     if(perm!=='granted'){toast('Notifications refusées dans les réglages');return;}
     let sub=await swReg.pushManager.getSubscription();
+    if(sub){const existing=sub.options.applicationServerKey;const expected=b64ToU8(VAPID_PUBLIC);if(!existing||new Uint8Array(existing).length!==expected.length||new Uint8Array(existing).some((x,i)=>x!==expected[i])){await sub.unsubscribe();sub=null;}}
     if(!sub)sub=await swReg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64ToU8(VAPID_PUBLIC)});
     const j=sub.toJSON();
     const key=(j.keys&&j.keys.auth?j.keys.auth:('s'+Date.now())).replace(/[.#$\[\]\/]/g,'_');
-    if(!SYNC.pushRef)throw Error('Synchronisation indisponible');await SYNC.pushRef.child(key).update({endpoint:j.endpoint,keys:j.keys,at:Date.now(),ua:navigator.userAgent.slice(0,120),uid:SYNC.user.uid,owner:$('#push-owner')?.value||meAsPayer(),timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,followItinerary:true,trips:[TRIP],disabled:false});await SYNC.ref.child('notificationSettings').update({enabled:true,mode:'individual',requestedAt:Date.now()});
+    if(!SYNC.pushRef)throw Error('Synchronisation indisponible');await SYNC.pushRef.child(key).update({endpoint:j.endpoint,keys:j.keys,vapidPublicKey:VAPID_PUBLIC,at:Date.now(),ua:navigator.userAgent.slice(0,120),uid:SYNC.user.uid,owner:$('#push-owner')?.value||meAsPayer(),timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,followItinerary:true,trips:[TRIP],disabled:false});await SYNC.ref.child('notificationSettings').update({enabled:true,mode:'individual',requestedAt:Date.now()});
     await swReg.showNotification("Appareil inscrit — Tour d’Asie",{body:'Ce message confirme l’inscription de l’appareil. Utilise le test serveur pour vérifier la réception site fermé.',icon:'icon-192.png',badge:'icon-192.png'});
     toast('Appareil inscrit ; vérifie le service et lance le test.');updatePushServiceStatus();
   }catch(e){toast('Échec notifs : '+(e&&e.message?e.message:e));}
 }
 
-async function currentPushDevice(){if(!('serviceWorker'in navigator)||!('PushManager'in window))return null;const reg=await navigator.serviceWorker.ready;const sub=await reg.pushManager.getSubscription();if(!sub)return null;const j=sub.toJSON();const key=j.keys?.auth?.replace(/[.#$\[\]\/]/g,'_');return key?{key,ref:SYNC.pushRef?.child(key)}:null;}
+async function currentPushDevice(){if(!('serviceWorker'in navigator)||!('PushManager'in window))return null;const reg=await navigator.serviceWorker.ready;const sub=await reg.pushManager.getSubscription();if(!sub)return null;const expected=b64ToU8(VAPID_PUBLIC),actual=sub.options.applicationServerKey;if(!actual||new Uint8Array(actual).length!==expected.length||new Uint8Array(actual).some((x,i)=>x!==expected[i]))return null;const j=sub.toJSON();const key=j.keys?.auth?.replace(/[.#$\[\]\/]/g,'_');return key?{key,ref:SYNC.pushRef?.child(key)}:null;}
 async function refreshPushDevice(){if(!SYNC.pushRef||!('Notification'in window)||Notification.permission!=='granted')return;const device=await currentPushDevice();if(device?.ref)await device.ref.update({timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,lastSeenAt:Date.now()});}
-async function updatePushServiceStatus(){const el=$('#push-service-status');if(!el||!SYNC.ref)return;try{const service=(await SYNC.ref.child('notificationService').once('value')).val();const fresh=service?.status==='active'&&Date.now()-service.lastRunAt<3600000;el.textContent=fresh?'✅ Service d’envoi actif. Inscris chaque téléphone puis lance le test site fermé.':'⏳ Envoi automatique non confirmé : le service serveur reste à connecter ou à vérifier. Inscrire le téléphone seul ne programme pas les envois.';}catch(e){el.textContent='Impossible de vérifier le service d’envoi pour le moment.';}}
+async function updatePushServiceStatus(){const el=$('#push-service-status');if(!el||!SYNC.ref)return;try{const service=(await SYNC.ref.child('notificationService').once('value')).val();const fresh=service?.status==='active'&&Date.now()-service.lastRunAt<3600000;el.textContent=fresh?(service.needsRegistration?'✅ Service actif. Réinscris ce téléphone avec le bouton ci-dessus, puis lance le test site fermé.':'✅ Service d’envoi actif. Inscris chaque téléphone puis lance le test site fermé.'):'⏳ Envoi automatique non confirmé : le service serveur reste à connecter ou à vérifier. Inscrire le téléphone seul ne programme pas les envois.';}catch(e){el.textContent='Impossible de vérifier le service d’envoi pour le moment.';}}
 async function testServerPush(){try{if(!SYNC.ref)throw Error('Connecte-toi d’abord');const service=(await SYNC.ref.child('notificationService').once('value')).val();if(service?.status!=='active'||Date.now()-service.lastRunAt>3600000){toast('Le service serveur doit être activé avant le test.');return;}const device=await currentPushDevice();if(!device?.ref){toast('Inscris ce téléphone aux notifications d’abord.');return;}await device.ref.update({testRequestedAt:Date.now()});toast('Test demandé : ferme le carnet. Envoi au prochain passage, sous 15 minutes.');}catch(e){toast('Test impossible : '+e.message);}}
 
 /* ============ HELPERS ============ */
@@ -691,18 +696,20 @@ const eur=n=>Math.round(n).toLocaleString('fr-FR')+' €';
 const fdate=s=>pd(s).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'});
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._);t._=setTimeout(()=>t.classList.remove('show'),2100);}
 const cssId=s=>s.replace(/[^a-z0-9]/gi,'_');
-const esc=s=>s.replace(/'/g,"\\'");
+const esc=TravelSecurity.inlineString;
+const htmlText=TravelSecurity.htmlText;
+const richHTML=TravelSecurity.richHTML;
 
 function stageUnits(st){let u=0;st.blocks.forEach(b=>{u+=b.days?b.days.length:1;});return u;}
 function stageDone(st){let d=0;st.blocks.forEach(b=>{if(b.days){b.days.forEach(dy=>{if(S.days[st.id+'-'+dy.n])d++;});}else{if(S.blocks[st.id+'-'+b.c])d++;}});return d;}
 function tripUnits(){return STAGES.reduce((a,s)=>a+stageUnits(s),0);}
 function tripDone(){return STAGES.reduce((a,s)=>a+stageDone(s),0);}
 function fmtRange(st){const o={day:'numeric',month:'short'};return pd(st.start).toLocaleDateString('fr-FR',o)+' → '+pd(st.end).toLocaleDateString('fr-FR',o);}
-function stagePhoto(st){return S.photos[st.id]||(st.photo?IMG(st.photo):null);}
+function stagePhoto(st){return TravelSecurity.imageURL(S.photos[st.id]||(st.photo?IMG(st.photo):''))||null;}
 function bannerBg(st){
   const url=stagePhoto(st),ov="linear-gradient(180deg,rgba(40,32,24,.12),rgba(40,32,24,.62))",
     fb=`linear-gradient(135deg,${st.col},${shade(st.col,-22)})`;
-  return url?`background-image:${ov},url('${url}'),${fb}`:`background-image:${ov},${fb}`;
+  return url?`background-image:${ov},url('${htmlText(encodeURI(url).replace(/'/g,'%27'))}'),${fb}`:`background-image:${ov},${fb}`;
 }
 function shade(hex,p){let n=parseInt(hex.slice(1),16),r=(n>>16)+p,g=(n>>8&255)+p,b=(n&255)+p;
   r=Math.max(0,Math.min(255,r));g=Math.max(0,Math.min(255,g));b=Math.max(0,Math.min(255,b));
@@ -738,7 +745,7 @@ function renderToday(){
       <div class="big">🏡 De retour</div><div class="sub">7,5 mois · 6 pays · il reste les rushes à monter !</div></div></div>`;
   } else {
     const done=dbtw(start,t),pct=Math.round(done/total*100),ph=cur?stagePhoto(cur):null;
-    const bg=ph?`background-image:linear-gradient(180deg,rgba(40,32,24,.1),rgba(40,32,24,.66)),url('${ph}'),linear-gradient(135deg,${cur.col},${shade(cur.col,-22)})`:'';
+    const bg=ph?`background-image:linear-gradient(180deg,rgba(40,32,24,.1),rgba(40,32,24,.66)),url('${htmlText(encodeURI(ph).replace(/'/g,'%27'))}'),linear-gradient(135deg,${cur.col},${shade(cur.col,-22)})`:'';
     html+=`<div class="phero" ${ph?`style="${bg};background-size:cover;background-position:center"`:''}><div class="pc">
       <span class="badge">Jour ${done+1} / ${total}</span>
       <div class="cur">${cur?cur.fl:'🌏'} ${cur?cur.nm:'En transit'}</div>
@@ -761,22 +768,22 @@ function renderToday(){
     const w=remWhen(next,t);
     html+=`<div class="sec-title">Prochain rappel</div>
     <div class="rem" onclick="nav('rem')"><span class="barcol" style="background:var(--acc)"></span>
-      <span class="icn">${next.icon}</span><div class="ri"><div class="t">${next.t}</div>
-      <div class="s">${next.s}</div><span class="when ${w.cls}">${w.label}</span>
+      <span class="icn">${htmlText(next.icon)}</span><div class="ri"><div class="t">${richHTML(next.t)}</div>
+      <div class="s">${richHTML(next.s)}</div><span class="when ${w.cls}">${w.label}</span>
       ${next.push?'<div class="bell">🔔 notification push programmée</div>':''}</div></div>`;
   }
 
   // galerie
   html+=`<div class="sec-title">Aperçu du voyage</div>
-  <div class="strip">${GALLERY.map(g=>`<div class="pcard"><img class="im" loading="lazy" src="${IMG(g.id)}" onerror="this.style.display='none'"><div class="cap">${g.c}</div></div>`).join('')}</div>`;
+  <div class="strip">${GALLERY.map(g=>`<div class="pcard"><img class="im" loading="lazy" src="${htmlText(IMG(g.id))}" onerror="this.style.display='none'"><div class="cap">${htmlText(g.c)}</div></div>`).join('')}</div>`;
 
   // suite du parcours
   html+=`<div class="sec-title">La suite du parcours</div><div class="card">`;
   let up=STAGES.filter(st=>pd(st.end)>t).slice(0,4);if(!up.length)up=STAGES.slice(-2);
   up.forEach(st=>{const dsc=stageDone(st),tot=stageUnits(st),now=cur&&cur.id===st.id;
     html+=`<div class="mini" onclick="nav('itin')"><span class="dot" style="background:${st.col}"></span>
-      <div class="txt"><div class="t">${st.fl} ${st.nm} ${now?'<span class="tag now" style="background:var(--acc-soft);color:var(--acc-d)">ici</span>':''}</div>
-      <div class="d">${fmtRange(st)} · ${st.days} j · ${dsc}/${tot} faits</div></div></div>`;});
+      <div class="txt"><div class="t">${htmlText(st.fl)} ${htmlText(st.nm)} ${now?'<span class="tag now" style="background:var(--acc-soft);color:var(--acc-d)">ici</span>':''}</div>
+      <div class="d">${fmtRange(st)} · ${htmlText(st.days)} j · ${dsc}/${tot} faits</div></div></div>`;});
   html+=`</div>`;
   $('#v-today').innerHTML=html;
 }
@@ -796,24 +803,24 @@ function remWhen(r,t){
 let PRATIQUE={};
 function pratiqueHtml(st){
   const p=(typeof PRATIQUE!=='undefined')?PRATIQUE[st.id]:null; if(!p)return '';
-  const phr=(p.phr||[]).map(x=>`<div class="phr"><span class="phr-fr">${x[0]}</span> → <span class="phr-loc">${x[1]}</span>${(x[2]&&x[2]!=='—')?` <span class="phr-ph">(${x[2]})</span>`:''}</div>`).join('');
+  const phr=(p.phr||[]).map(x=>`<div class="phr"><span class="phr-fr">${richHTML(x[0])}</span> → <span class="phr-loc">${richHTML(x[1])}</span>${(x[2]&&x[2]!=='—')?` <span class="phr-ph">(${richHTML(x[2])})</span>`:''}</div>`).join('');
   return `<div class="prat folded">
     <div class="prat-h" onclick="this.parentNode.classList.toggle('folded')">🆘 Infos pratiques <span class="prat-off">(hors-ligne)</span><span class="rchev">▾</span></div>
     <div class="prat-body">
-      <div class="prat-row"><b>🚨 Urgences</b><div>${p.urg}</div></div>
-      <div class="prat-row"><b>🇫🇷 Ambassade / consulat</b><div>${p.amb}</div></div>
-      <div class="prat-row"><b>🔌 Prise &amp; courant</b><div>${p.prise}</div></div>
-      <div class="prat-row"><b>💰 Argent &amp; pourboire</b><div>${p.money}</div></div>
-      <div class="prat-row"><b>🚰 Eau du robinet</b><div>${p.eau}</div></div>
-      <div class="prat-row"><b>⚠️ Bon à savoir</b><div>${p.arn}</div></div>
+      <div class="prat-row"><b>🚨 Urgences</b><div>${richHTML(p.urg)}</div></div>
+      <div class="prat-row"><b>🇫🇷 Ambassade / consulat</b><div>${richHTML(p.amb)}</div></div>
+      <div class="prat-row"><b>🔌 Prise &amp; courant</b><div>${richHTML(p.prise)}</div></div>
+      <div class="prat-row"><b>💰 Argent &amp; pourboire</b><div>${richHTML(p.money)}</div></div>
+      <div class="prat-row"><b>🚰 Eau du robinet</b><div>${richHTML(p.eau)}</div></div>
+      <div class="prat-row"><b>⚠️ Bon à savoir</b><div>${richHTML(p.arn)}</div></div>
       <div class="prat-row"><b>🗣️ Phrases utiles</b><div class="phrs">${phr}</div></div>
     </div>
   </div>`;
 }
-function handbookPanel(title,rows){return `<details class="card" style="margin:10px 0;padding:12px"><summary style="font-weight:700;cursor:pointer">${title}</summary><div style="margin-top:10px">${rows.map(r=>`<div class="prat-row"><b>${r[0]}</b><div>${r[1]}</div></div>`).join('')}</div></details>`;}
+function handbookPanel(title,rows){return `<details class="card" style="margin:10px 0;padding:12px"><summary style="font-weight:700;cursor:pointer">${richHTML(title)}</summary><div style="margin-top:10px">${rows.map(r=>`<div class="prat-row"><b>${richHTML(r[0])}</b><div>${richHTML(r[1])}</div></div>`).join('')}</div></details>`;}
 function handbookHtml(id){return (HANDBOOK.sections||[]).filter(x=>!id||x.id===id).map(x=>handbookPanel(x.title,x.rows)).join('');}
 function destinationGuideHtml(b){return b.practical?handbookPanel('🧭 Préparer cette étape — arrivée, visites et départ',b.practical):'';}
-function dayGuideHtml(d){return d.practical?`<details style="margin:8px 0;font-size:12.5px"><summary style="cursor:pointer;font-weight:700">📝 Conseils pour cette journée</summary><div style="margin-top:6px;color:var(--ink2)">${d.practical}</div></details>`:'';}
+function dayGuideHtml(d){return d.practical?`<details style="margin:8px 0;font-size:12.5px"><summary style="cursor:pointer;font-weight:700">📝 Conseils pour cette journée</summary><div style="margin-top:6px;color:var(--ink2)">${richHTML(d.practical)}</div></details>`:'';}
 function renderItin(){
   const t=today();let cur=null;for(const st of STAGES){if(t>=pd(st.start)&&t<pd(st.end)){cur=st;break;}}
   let html=`<div class="sec-title">${STAGES.length} étapes · ${tripDates()} · ${TRAVELERS} pers</div>${handbookHtml('itin')}${handbookHtml('open')}`;
@@ -824,17 +831,17 @@ function renderItin(){
         <div class="ringw">${ring(pct)}</div>
         <button class="photobtn" onclick="event.stopPropagation();openPhoto('${st.id}')">📷</button>
         <div class="bov">
-          <span class="fl">${st.fl}</span>
-          <div class="bi"><div class="nm">${st.nm} ${st.tag==='val'?'<span class="tag val">validé</span>':''}${st.tag==='add'?'<span class="tag add">hors sentiers</span>':''}${now?'<span class="tag now">ici</span>':''}</div>
-          <div class="meta">${fmtRange(st)} · ${st.days} j · ${eur(st.budget)}</div></div>
+          <span class="fl">${htmlText(st.fl)}</span>
+          <div class="bi"><div class="nm">${htmlText(st.nm)} ${st.tag==='val'?'<span class="tag val">validé</span>':''}${st.tag==='add'?'<span class="tag add">hors sentiers</span>':''}${now?'<span class="tag now">ici</span>':''}</div>
+          <div class="meta">${fmtRange(st)} · ${htmlText(st.days)} j · ${eur(st.budget)}</div></div>
           <span class="chev">▶</span>
         </div>
       </div>
       <div class="stage-body">
-        <div class="sb-line"><span class="k">Route</span><span>${st.route}</span></div>
-        <div class="sb-line"><span class="k">Visa</span><span>${st.visa}</span></div>
-        ${st.note?`<div class="sb-line"><span class="k">À noter</span><span>${st.note}</span></div>`:''}
-        <div class="film"><b>📸 À filmer :</b> ${st.film}</div>
+        <div class="sb-line"><span class="k">Route</span><span>${richHTML(st.route)}</span></div>
+        <div class="sb-line"><span class="k">Visa</span><span>${richHTML(st.visa)}</span></div>
+        ${st.note?`<div class="sb-line"><span class="k">À noter</span><span>${richHTML(st.note)}</span></div>`:''}
+        <div class="film"><b>📸 À filmer :</b> ${richHTML(st.film)}</div>
         ${pratiqueHtml(st)}${st.blocks.map(b=>blockHtml(st,b)).join('')}
       </div></div>`;
   });
@@ -852,9 +859,9 @@ function spotsHtml(st,b){
     b.spots.map(sp=>{
       const nm=(typeof sp==='string')?sp:sp.n;
       const star=`<span class="wish ${isWished(nm)?'on':''}" onclick="event.stopPropagation();toggleWishItin('${esc(nm)}',this)">${isWished(nm)?'★':'☆'}</span>`;
-      const link=`<a class="spot" target="_blank" rel="noopener" onclick="event.stopPropagation()" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(nm+ctx)}">${nm}</a>`;
-      const p=(sp&&sp.p)?`<span class="spot-p">${sp.p}</span>`:'';
-      const t=(sp&&sp.t)?`<div class="spot-t">💡 ${sp.t}</div>`:'';
+      const link=`<a class="spot" target="_blank" rel="noopener" onclick="event.stopPropagation()" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(nm+ctx)}">${htmlText(nm)}</a>`;
+      const p=(sp&&sp.p)?`<span class="spot-p">${richHTML(sp.p)}</span>`:'';
+      const t=(sp&&sp.t)?`<div class="spot-t">💡 ${richHTML(sp.t)}</div>`:'';
       return `<div class="spot-row">${star}${link}${p}${t}</div>`;
     }).join('')+`</div>`;
 }
@@ -866,9 +873,9 @@ function fichesHtml(st,b,names){
     const sp=findSpot(b,nm);
     const label=(typeof sp==='string')?sp:sp.n;
     const star=`<span class="wish ${isWished(label)?'on':''}" onclick="event.stopPropagation();toggleWishItin('${esc(label)}',this)">${isWished(label)?'★':'☆'}</span>`;
-    const link=`<a class="spot" target="_blank" rel="noopener" onclick="event.stopPropagation()" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(label+ctx)}">${label}</a>`;
-    const p=(sp&&sp.p)?`<span class="spot-p">${sp.p}</span>`:'';
-    const t=(sp&&sp.t)?`<div class="spot-t">💡 ${sp.t}</div>`:'';
+    const link=`<a class="spot" target="_blank" rel="noopener" onclick="event.stopPropagation()" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(label+ctx)}">${htmlText(label)}</a>`;
+    const p=(sp&&sp.p)?`<span class="spot-p">${richHTML(sp.p)}</span>`:'';
+    const t=(sp&&sp.t)?`<div class="spot-t">💡 ${richHTML(sp.t)}</div>`:'';
     return `<div class="spot-row">${star}${link}${p}${t}</div>`;
   }).join('')+`</div>`;
 }
@@ -878,9 +885,9 @@ function restoHtml(st,b){
   const rows=b.resto.map(r=>{
       const nm=r.n;
       const star=`<span class="wish ${isWished(nm)?'on':''}" onclick="event.stopPropagation();toggleWishItin('${esc(nm)}',this)">${isWished(nm)?'★':'☆'}</span>`;
-      const link=`<a class="spot" target="_blank" rel="noopener" onclick="event.stopPropagation()" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(nm+ctx)}">${nm}</a>`;
-      const p=r.p?`<span class="spot-p">${r.p}</span>`:'';
-      const t=r.t?`<div class="spot-t">🍽️ ${r.t}</div>`:'';
+      const link=`<a class="spot" target="_blank" rel="noopener" onclick="event.stopPropagation()" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(nm+ctx)}">${htmlText(nm)}</a>`;
+      const p=r.p?`<span class="spot-p">${richHTML(r.p)}</span>`:'';
+      const t=r.t?`<div class="spot-t">🍽️ ${richHTML(r.t)}</div>`:'';
       return `<div class="spot-row">${star}${link}${p}${t}</div>`;
     }).join('');
   return `<div class="spots resto folded"><span class="spots-l resto-toggle" onclick="event.stopPropagation();this.parentNode.classList.toggle('folded')">🍜 Où manger <span class="rcount">${b.resto.length}</span> <span class="rchev">▾</span></span><div class="resto-list">${rows}</div></div>`;
@@ -888,9 +895,9 @@ function restoHtml(st,b){
 let SOCIAL={};
 function socialHtml(st,b){
   const s=(typeof SOCIAL!=='undefined'&&SOCIAL[b.c])||b.social; if(!s)return '';
-  const ph=(s.ph||[]).map(x=>`<div class="so-item">📸 ${x}</div>`).join('');
-  const f=s.f?`<div class="so-item">💡 ${s.f}</div>`:'';
-  const cap=(s.cap||[]).map(x=>`<div class="so-cap">✍️ « ${x} »</div>`).join('');
+  const ph=(s.ph||[]).map(x=>`<div class="so-item">📸 ${richHTML(x)}</div>`).join('');
+  const f=s.f?`<div class="so-item">💡 ${richHTML(s.f)}</div>`:'';
+  const cap=(s.cap||[]).map(x=>`<div class="so-cap">✍️ « ${richHTML(x)} »</div>`).join('');
   return `<div class="spots social folded"><span class="spots-l resto-toggle" onclick="event.stopPropagation();this.parentNode.classList.toggle('folded')">📱 Pour Insta &amp; TikTok <span class="rchev">▾</span></span><div class="resto-list so-list">${ph}${f}${cap}</div></div>`;
 }
 function blockHtml(st,b){
@@ -901,17 +908,17 @@ function blockHtml(st,b){
     return `<div class="block" id="blk-${cssId(bid)}">
       <div class="block-h ${all?'done':''}">
         <div class="cb ${all?'on':''}" onclick="toggleBlockDays('${st.id}','${esc(b.c)}',event)"></div>
-        <div class="bt" onclick="toggleDays('${cssId(bid)}')"><div class="c">${b.c}</div><div class="dd">${b.dd}</div></div>
+        <div class="bt" onclick="toggleDays('${cssId(bid)}')"><div class="c">${htmlText(b.c)}</div><div class="dd">${htmlText(b.dd)}</div></div>
         ${mapl}<div class="exp" onclick="toggleDays('${cssId(bid)}')">▾</div></div>
       ${destinationGuideHtml(b)}<div class="days">${b.days.map(d=>{const done=S.days[st.id+'-'+d.n];return`
         <div class="day ${done?'done':''}"><div class="cb ${done?'on':''}" onclick="toggleDay('${st.id}',${d.n})"></div>
-          <span class="num">J${d.n}</span><div class="dtx"><span class="dc">${d.dt}</span> — ${d.t}${dayGuideHtml(d)}${fichesHtml(st,b,d.sp)}</div></div>`;}).join('')}</div>${restoHtml(st,b)}${socialHtml(st,b)}</div>`;
+          <span class="num">J${d.n}</span><div class="dtx"><span class="dc">${htmlText(d.dt)}</span> — ${richHTML(d.t)}${dayGuideHtml(d)}${fichesHtml(st,b,d.sp)}</div></div>`;}).join('')}</div>${restoHtml(st,b)}${socialHtml(st,b)}</div>`;
   }
   const done=S.blocks[bid];
   return `<div class="block"><div class="block-h ${done?'done':''}">
     <div class="cb ${done?'on':''}" onclick="toggleSimpleBlock('${st.id}','${esc(b.c)}')"></div>
-    <div class="bt"><div class="c">${b.c} <span style="color:var(--muted);font-weight:400;font-size:12px">· ${b.dd}</span></div>
-    <div class="dd" style="margin-top:3px">${b.sum}</div></div>${mapl}</div>${destinationGuideHtml(b)}${spotsHtml(st,b)}${restoHtml(st,b)}${socialHtml(st,b)}</div>`;
+    <div class="bt"><div class="c">${htmlText(b.c)} <span style="color:var(--muted);font-weight:400;font-size:12px">· ${htmlText(b.dd)}</span></div>
+    <div class="dd" style="margin-top:3px">${richHTML(b.sum)}</div></div>${mapl}</div>${destinationGuideHtml(b)}${spotsHtml(st,b)}${restoHtml(st,b)}${socialHtml(st,b)}</div>`;
 }
 function toggleStage(id){$('#stg-'+id).classList.toggle('open');}
 function toggleDays(cid){$('#blk-'+cid).classList.toggle('open');}
@@ -924,15 +931,15 @@ function toggleSimpleBlock(sid,c){S.blocks[sid+'-'+c]=!S.blocks[sid+'-'+c];save(
 function openPhoto(sid){
   const st=STAGES.find(s=>s.id===sid),cur=S.photos[sid]||'';
   $('#modal').innerHTML=`<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="sheet">
-    <div class="grabber"></div><h3>📷 Photo — ${st.fl} ${st.nm}</h3>
+    <div class="grabber"></div><h3>📷 Photo — ${htmlText(st.fl)} ${htmlText(st.nm)}</h3>
     <p style="color:var(--ink2);font-size:13px;margin:0 2px 4px">Colle le lien (URL) d'une de tes photos pour l'utiliser en bandeau de cette étape. Laisse vide pour revenir au visuel par défaut.</p>
     <label class="fl-l">Lien de l'image (https://…)</label>
-    <input id="ph-url" type="url" inputmode="url" placeholder="https://…" value="${cur}">
+    <input id="ph-url" type="url" inputmode="url" placeholder="https://…" value="${htmlText(cur)}">
     <button class="btn" onclick="savePhoto('${sid}')">Enregistrer la photo</button>
     <button class="btn ghost" onclick="clearPhoto('${sid}')">Remettre le visuel par défaut</button>
     <button class="btn ghost" onclick="closeModal()">Annuler</button></div></div>`;
 }
-function savePhoto(sid){const u=$('#ph-url').value.trim();if(u)S.photos[sid]=u;else delete S.photos[sid];save();closeModal();renderItin();renderToday();toast('✓ Photo mise à jour');}
+function savePhoto(sid){const u=$('#ph-url').value.trim();if(u&&!TravelSecurity.imageURL(u)){toast('Utilise un lien d’image HTTPS valide');return;}if(u)S.photos[sid]=u;else delete S.photos[sid];save();closeModal();renderItin();renderToday();toast('✓ Photo mise à jour');}
 function clearPhoto(sid){delete S.photos[sid];save();closeModal();renderItin();renderToday();toast('Visuel par défaut rétabli');}
 
 /* ============ BUDGET ============ */
@@ -940,7 +947,7 @@ function clearPhoto(sid){delete S.photos[sid];save();closeModal();renderItin();r
 const PAYERS=[{id:"marie",nm:"Marie",em:"👩"},{id:"baptiste",nm:"Baptiste",em:"👨"}];
 function rateOf(cur){const r=(S.rates&&S.rates[cur]!=null)?S.rates[cur]:DEFAULT_RATES[cur];return (r!=null)?r:1;}
 function toEur(e){return (parseFloat(e.amt)||0)*rateOf(e.cur||'EUR');}
-function fmtCur(amt,cur){cur=cur||'EUR';const c=CURRENCIES.find(x=>x.c===cur),sym=c?c.s:cur,n=Math.round(amt).toLocaleString('fr-FR');return cur==='EUR'?(n+' €'):(n+' '+sym);}
+function fmtCur(amt,cur){cur=cur||'EUR';const c=CURRENCIES.find(x=>x.c===cur),sym=c?c.s:htmlText(cur),n=Math.round(amt).toLocaleString('fr-FR');return cur==='EUR'?(n+' €'):(n+' '+sym);}
 function payerName(id){const p=PAYERS.find(x=>x.id===id);return p?p.nm:'';}
 function otherPayer(id){return id==='baptiste'?'marie':'baptiste';}
 function expenseBeneficiary(e){return PAYERS.some(p=>p.id===e.for)?e.for:'both';}
@@ -1008,7 +1015,7 @@ function renderBudget(){
   </div>`;
   html+=`<div class="sec-title">Par pays — réel vs prévu</div><div class="card">`;
   BUDGET_PREVU.forEach(b=>{const r=S.expenses.filter(e=>e.country===b.id).reduce((a,e)=>a+toEur(e),0),p=Math.min(100,r/b.v*100),over=r>b.v;
-    html+=`<div class="cat-line" style="flex-wrap:wrap"><span class="fl">${b.fl}</span><span class="nm">${b.nm}</span>
+    html+=`<div class="cat-line" style="flex-wrap:wrap"><span class="fl">${htmlText(b.fl)}</span><span class="nm">${htmlText(b.nm)}</span>
       <span class="amt"><span class="r" style="color:${over?'var(--red)':'var(--ink)'}">${eur(r)}</span> <span class="p">/ ${eur(b.v)}</span></span>
       <div class="tinybar" style="flex-basis:100%"><i style="width:${p}%;background:${over?'var(--red)':'linear-gradient(90deg,var(--acc),var(--gold))'}"></i></div></div>`;});
   html+=`</div><div class="sec-title">Par catégorie</div><div class="card">`;
@@ -1018,11 +1025,11 @@ function renderBudget(){
   if(!S.expenses.length)html+=`<div class="empty">Aucune dépense.<br>Appuie sur <b>+</b> en bas à droite pour en ajouter.</div>`;
   else [...S.expenses].sort((a,b)=>b.id-a.id).forEach(e=>{const c=CATS.find(x=>x.id===e.cat)||{fl:'💸'},co=BUDGET_PREVU.find(x=>x.id===e.country)||{fl:'🌏',nm:''};
     const orig=(e.cur&&e.cur!=='EUR');
-    html+=`<div class="exp-item"><span class="em">${c.fl}</span><div class="ei"><div class="t">${e.label||c.nm}</div>
-      <div class="s">${co.fl} ${co.nm} · ${e.date||''} · payé par ${payerName(e.by||'marie')} · ${expenseForLabel(e)}</div></div>
+    html+=`<div class="exp-item"><span class="em">${c.fl}</span><div class="ei"><div class="t">${htmlText(e.label||c.nm)}</div>
+      <div class="s">${htmlText(co.fl)} ${htmlText(co.nm)} · ${htmlText(e.date||'')} · payé par ${payerName(e.by||'marie')} · ${expenseForLabel(e)}</div></div>
       <span class="ea" style="text-align:right">${orig?`${fmtCur(e.amt,e.cur)}<div style="font-size:10px;color:var(--muted);font-weight:600">≈ ${eur(toEur(e))}</div>`:eur(toEur(e))}</span>
-      ${e.receipt?`<button class="del" style="color:var(--acc-d)" onclick="viewReceipt(${e.id})" title="Voir le reçu">🧾</button>`:''}
-      <button class="del" onclick="delExpense(${e.id})">✕</button></div>`;});
+      ${e.receipt?`<button class="del" style="color:var(--acc-d)" onclick="viewReceipt(${TravelSecurity.numericId(e.id)})" title="Voir le reçu">🧾</button>`:''}
+      <button class="del" onclick="delExpense(${TravelSecurity.numericId(e.id)})">✕</button></div>`;});
   html+=`</div>`;
   $('#v-budget').innerHTML=html;
 }
@@ -1035,7 +1042,7 @@ function openSettle(){
     <div class="grabber"></div><h3>🔁 Remboursement</h3>
     <p style="color:var(--ink2);font-size:13px;margin:0 2px 8px">Quand l'un rembourse l'autre (ex. sa part du vol), enregistre-le ici pour rééquilibrer les comptes. Ce n'est pas une dépense partagée, juste un transfert entre vous.</p>
     <label class="fl-l">Qui rembourse (donne l'argent) ?</label>
-    <div class="chips" id="s-from">${PAYERS.map(p=>`<button class="chip ${p.id===settleSel.from?'on':''}" data-c="${p.id}" onclick="pickFrom('${p.id}')">${p.em} ${p.nm}</button>`).join('')}</div>
+    <div class="chips" id="s-from">${PAYERS.map(p=>`<button class="chip ${p.id===settleSel.from?'on':''}" data-c="${p.id}" onclick="pickFrom('${p.id}')">${p.em} ${htmlText(p.nm)}</button>`).join('')}</div>
     <label class="fl-l">Devise</label>
     <select id="s-cur">${CURRENCIES.map(c=>`<option value="${c.c}" ${c.c==='EUR'?'selected':''}>${c.s} ${c.c} — ${c.nm}</option>`).join('')}</select>
     <label class="fl-l">Montant</label><input id="s-amt" type="number" inputmode="decimal" placeholder="0" step="0.01">
@@ -1071,17 +1078,17 @@ function renderRem(){
     html+=`<button class="btn" onclick="openSync()">🔔 Notifications sur mon téléphone</button>`;
     html+=`<div class="info">✓ Chaque tâche a sa propre case. Pour recevoir chaque tâche site fermé : inscrire le téléphone, autoriser les notifications et vérifier le service d’envoi avec le test. Tant que le serveur n’est pas confirmé actif, les nouveaux envois ne sont pas programmés. Les dates de préparation sont des repères, pas des délais officiels de réservation.</div>`;
     const doneCount=REMINDERS.filter(r=>S.reminders[r.id]).length;
-    html+=`<div class="card tight"><b>${doneCount} / ${REMINDERS.length} tâches cochées</b><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px"><select aria-label="Période des rappels" onchange="setReminderFilter('period',this.value)">${[['week','À faire · 7 prochains jours'],['today','À faire · aujourd’hui et en retard'],['pending','Toutes les tâches à faire'],['all','Tout le séjour'],['done','Tâches cochées']].map(x=>`<option value="${x[0]}" ${remPeriod===x[0]?'selected':''}>${x[1]}</option>`).join('')}</select><select aria-label="Catégorie des rappels" onchange="setReminderFilter('category',this.value)">${REM_CATEGORIES.map(x=>`<option value="${x[0]}" ${remCategory===x[0]?'selected':''}>${x[1]}</option>`).join('')}</select><select aria-label="Pays des rappels" onchange="setReminderFilter('stage',this.value)"><option value="all">Tous les pays</option>${STAGES.map(st=>`<option value="${st.id}" ${remStage===st.id?'selected':''}>${st.fl} ${st.nm}</option>`).join('')}</select></div></div>`;
+    html+=`<div class="card tight"><b>${doneCount} / ${REMINDERS.length} tâches cochées</b><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px"><select aria-label="Période des rappels" onchange="setReminderFilter('period',this.value)">${[['week','À faire · 7 prochains jours'],['today','À faire · aujourd’hui et en retard'],['pending','Toutes les tâches à faire'],['all','Tout le séjour'],['done','Tâches cochées']].map(x=>`<option value="${htmlText(x[0])}" ${remPeriod===x[0]?'selected':''}>${richHTML(x[1])}</option>`).join('')}</select><select aria-label="Catégorie des rappels" onchange="setReminderFilter('category',this.value)">${REM_CATEGORIES.map(x=>`<option value="${htmlText(x[0])}" ${remCategory===x[0]?'selected':''}>${richHTML(x[1])}</option>`).join('')}</select><select aria-label="Pays des rappels" onchange="setReminderFilter('stage',this.value)"><option value="all">Tous les pays</option>${STAGES.map(st=>`<option value="${st.id}" ${remStage===st.id?'selected':''}>${htmlText(st.fl)} ${htmlText(st.nm)}</option>`).join('')}</select></div></div>`;
     const rems=REMINDERS.filter(r=>reminderMatches(r,t)).sort((a,b)=>pd(a.date)-pd(b.date));
     html+=`<div class="sec-title">Réservations & démarches datées</div>`;
-    html+=`<div class="info">${rems.length} tâche(s) dans cette sélection. Pour les actions du matin ou du soir, le moment est indiqué dans leur description ; aucune heure précise de notification n’est programmée.</div>`;
+    html+=`<div class="info">${rems.length} tâche(s) dans cette sélection. Pour les actions du matin ou du soir, le moment est indiqué dans leur description ; les notifications sont prévues à 8 h pour le matin, 20 h pour le budget, 21 h pour le soir et 9 h pour les autres tâches, dans le fuseau du pays prévu.</div>`;
     if(!rems.length)html+=`<div class="empty">Aucune tâche dans ce filtre. Tu peux changer la période, le pays ou la catégorie.</div>`;
     let reminderDate='';rems.forEach(r=>{if(r.date!==reminderDate){reminderDate=r.date;html+=`<div class="sec-title">${fdate(r.date)}</div>`;}const w=remWhen(r,t),done=S.reminders[r.id];
       html+=`<div id="rem-${cssId(r.id)}" class="rem ${done?'done':''}"><span class="barcol" style="background:${done?'var(--sage)':barByWhen(w.cls)}"></span>
         <div class="cb ${done?'on':''}" onclick="toggleRem('${r.id}')" style="margin-top:1px"></div>
-        <div class="ri"><div class="t">${r.icon} ${r.t}</div><div class="s">${r.s}</div>${r.stage?`<button class="chip" style="margin-top:6px" onclick="gotoStage('${r.stage}')">Voir l’itinéraire</button>`:''}
+        <div class="ri"><div class="t">${htmlText(r.icon)} ${richHTML(r.t)}</div><div class="s">${richHTML(r.s)}</div>${r.stage?`<button class="chip" style="margin-top:6px" onclick="gotoStage('${r.stage}')">Voir l’itinéraire</button>`:''}
         <span class="when ${w.cls}">${w.label}</span>
-        ${r.push?'<div class="bell">🔔 notification push programmée</div>':'<div class="bell" style="color:var(--muted)">🔕 rappel dans l\'app</div>'}</div></div>`;});
+        <div class="bell">🔔 Rappel sur les téléphones inscrits au service</div></div></div>`;});
     // vols
     html+=`<div class="sec-title" style="margin-top:20px">Mes vols & enregistrement</div>`;
     html+=`<a class="btn" href="vols.html?v=16" style="display:block;text-align:center;text-decoration:none;margin:0 0 12px">✈️ Mon plan de vols — routes, prix &amp; liens de recherche</a>`;
@@ -1093,19 +1100,19 @@ function renderRem(){
       if(dep<now){st='✈️ Vol passé';cls='w-done';}
       else if(now>=ci){st='🟢 Enregistrement ouvert !';cls='w-now';}
       else{const h=Math.ceil((ci-now)/3600e3);st=h>48?`Check-in ouvre dans ${Math.ceil(h/24)} j`:`Check-in ouvre dans ${h} h`;cls='w-soon';}
-      html+=`<div class="flight"><div class="fr"><div class="rt">✈️ ${f.from} → ${f.to}</div>
-        <div class="dt">${pd(f.date).toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short',year:'numeric'})}${f.time?' · '+f.time:''}${f.conf?' · '+f.conf:''}</div>
-        <span class="ci ${cls}">${st}</span></div><button class="del" onclick="delFlight(${f.id})">✕</button></div>`;});
+      html+=`<div class="flight"><div class="fr"><div class="rt">✈️ ${htmlText(f.from)} → ${htmlText(f.to)}</div>
+        <div class="dt">${pd(f.date).toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short',year:'numeric'})}${f.time?' · '+htmlText(f.time):''}${f.conf?' · '+htmlText(f.conf):''}</div>
+        <span class="ci ${cls}">${st}</span></div><button class="del" onclick="delFlight(${TravelSecurity.numericId(f.id)})">✕</button></div>`;});
     html+=`<button class="btn ghost" style="margin-top:6px" onclick="openFlight()">＋ Ajouter un vol</button>`;
   } else if(remTab==='prep'){
     const all=CHECK.reduce((a,g)=>a+g.items.length,0),done=CHECK.reduce((a,g)=>a+g.items.filter(i=>S.check[i.id]).length,0);
     html+=`<div class="lhero"><span class="badge">Préparation</span><div class="big">${done}<small> / ${all} démarches</small></div>
       <div class="pbar"><i style="width:${Math.round(done/all*100)}%"></i></div>
       <div class="pmeta"><span>${Math.round(done/all*100)}% prêt</span><span>${all-done} restantes</span></div></div>`;
-    CHECK.forEach(g=>{html+=`<div class="ck-when">▹ ${g.when}</div>`;
+    CHECK.forEach(g=>{html+=`<div class="ck-when">▹ ${richHTML(g.when)}</div>`;
       g.items.forEach(i=>{const d=S.check[i.id];
         html+=`<div class="ck-item ${d?'done':''}" onclick="toggleCheck('${i.id}')"><div class="cb big ${d?'on':''}"></div>
-          <div class="ci"><div class="t">${i.t}</div>${i.s?`<div class="s">${i.s}</div>`:''}</div></div>`;});});
+          <div class="ci"><div class="t">${richHTML(i.t)}</div>${i.s?`<div class="s">${richHTML(i.s)}</div>`:''}</div></div>`;});});
   } else {
     const list=personalPack(packPerson),name=packPerson==='marie'?'Marie':'Baptiste';
     const pall=list.reduce((a,g)=>a+g.items.length,0),pdone=list.reduce((a,g)=>a+g.items.filter(i=>S.check[i.id]).length,0);
@@ -1116,10 +1123,10 @@ function renderRem(){
     html+=`<div class="info">🎒 ${name}, coche les affaires que tu as mises dans ton sac. Liste pour un sac de 40 L : les quantités de vêtements incluent la tenue portée. Lessive tous les 4–5 jours. Chaque personne valide son sac ; le matériel partagé est réparti entre vous.</div>`;
     if(PACK.some(g=>g.items.some(i=>S.check[i.id])))html+=`<div class="info">Les anciennes validations de la liste commune sont conservées. Confirme ici les affaires présentes dans chaque sac.</div>`;
     html+=`<div class="info">🧥 Superpose les couches : haut respirant → thermique si besoin → polaire/doudoune → veste imperméable. Objectif indicatif : 7–9 kg hors eau, à ajuster selon votre confort et la franchise des vols. Garde environ 5 L libres. Pas de matériel de camping prévu ; pour un trek autonome, il faudra une liste dédiée.</div>`;
-    list.forEach(g=>{html+=`<div class="ck-when">▹ ${g.cat}</div>`;
+    list.forEach(g=>{html+=`<div class="ck-when">▹ ${richHTML(g.cat)}</div>`;
       g.items.forEach(i=>{const d=S.check[i.id];
         html+=`<div class="ck-item ${d?'done':''}" onclick="toggleCheck('${i.id}')"><div class="cb big ${d?'on':''}"></div>
-          <div class="ci"><div class="t">${i.t}</div>${i.s?`<div class="s">${i.s}</div>`:''}</div></div>`;});});
+          <div class="ci"><div class="t">${richHTML(i.t)}</div>${i.s?`<div class="s">${richHTML(i.s)}</div>`:''}</div></div>`;});});
   }
   $('#v-rem').innerHTML=html;
 }
@@ -1184,9 +1191,9 @@ function spotIcon(col,on,n,resto){const em=resto?'🍜':spotEmoji(n);const sz=on
   return L.divIcon({className:'',iconSize:[sz,sz],iconAnchor:[sz/2,sz/2],
     html:`<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:${on?'#fff3d6':'rgba(255,255,255,.96)'};border:2px solid ${bd};box-shadow:0 1px 3px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;font-size:${on?19:17}px">${em}</div>`});}
 function spotPopup(st,b,sp,resto){const on=isWished(sp.n);
-  return `<div class="pop" style="max-width:230px"><b>${resto?'🍜 ':''}${sp.n}</b>${on?' ⭐':''}
-    ${sp.p?`<div class="pm">💰 ${sp.p}</div>`:''}
-    ${sp.t?`<div style="font-size:12px;color:#555;margin-top:3px">${resto?'🍽️':'💡'} ${sp.t}</div>`:''}
+  return `<div class="pop" style="max-width:230px"><b>${resto?'🍜 ':''}${htmlText(sp.n)}</b>${on?' ⭐':''}
+    ${sp.p?`<div class="pm">💰 ${richHTML(sp.p)}</div>`:''}
+    ${sp.t?`<div style="font-size:12px;color:#555;margin-top:3px">${resto?'🍽️':'💡'} ${richHTML(sp.t)}</div>`:''}
     <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(sp.n+', '+b.c+', '+st.nm)}" target="_blank" rel="noopener" style="font-size:12px;display:inline-block;margin-top:5px">Ouvrir dans Google Maps ↗</a><br>
     <a href="#" onclick="toggleWishMap('${esc(sp.n)}');return false;" style="font-size:12.5px;font-weight:700;display:inline-block;margin-top:5px;color:${on?'#b0402c':'var(--gold-d)'}">${on?'✔ Retirer des favoris':'⭐ Ajouter aux favoris'}</a></div>`;}
 function refreshSpotMarker(n,reopen){const r=spotMarkers[n];if(!r)return;r.marker.setIcon(spotIcon(r.col,isWished(n),n,r.resto));r.marker.setPopupContent(spotPopup(r.st,r.b,r.sp,r.resto));if(reopen)r.marker.openPopup();}
@@ -1215,10 +1222,10 @@ function openWishlist(){
   const w=S.wishlist||{};const total=Object.keys(w).length;const shown={};let body='';
   if(!total)body=`<div class="empty">Aucun favori pour le moment.<br>Touche l'étoile ☆ sur un lieu (carte ou itinéraire) pour l'ajouter.</div>`;
   else STAGES.forEach(st=>{const rows=[];st.blocks.forEach(b=>{[].concat(b.spots||[],b.resto||[]).forEach(sp=>{const n=(typeof sp==='string')?sp:sp.n;if(!w[n]||shown[n])return;shown[n]=1;
-    rows.push(`<div class="ck-item" style="margin-bottom:7px"><div class="ci"><div class="t">${n}</div>${(sp&&sp.p)?`<div class="s">💰 ${sp.p}</div>`:''}${(sp&&sp.t)?`<div class="s">💡 ${sp.t}</div>`:''}</div>
+    rows.push(`<div class="ck-item" style="margin-bottom:7px"><div class="ci"><div class="t">${htmlText(n)}</div>${(sp&&sp.p)?`<div class="s">💰 ${richHTML(sp.p)}</div>`:''}${(sp&&sp.t)?`<div class="s">💡 ${richHTML(sp.t)}</div>`:''}</div>
       <a class="mapl" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(n+', '+b.c+', '+st.nm)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">📍</a>
       <button class="del" style="color:#e8b64a;font-size:16px" onclick="wishRemove('${esc(n)}')">★</button></div>`);});});
-    if(rows.length)body+=`<div class="ck-when">${st.fl} ${st.nm}</div>`+rows.join('');});
+    if(rows.length)body+=`<div class="ck-when">${htmlText(st.fl)} ${htmlText(st.nm)}</div>`+rows.join('');});
   $('#modal').innerHTML=`<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="sheet">
     <div class="grabber"></div><h3>⭐ Mes favoris (${total})</h3>${body}
     <button class="btn ghost" onclick="closeModal()">Fermer</button></div></div>`;
@@ -1242,11 +1249,11 @@ function initMap(){
         const cur=curStage&&curStage.id===st.id;const sz=cur?36:30;
         const icon=L.divIcon({className:'',iconSize:[sz,sz],iconAnchor:[sz/2,sz/2],
           html:`<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:${col};border:2.5px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.45);color:#fff;font-size:${cur?15:14}px;font-weight:800;display:flex;align-items:center;justify-content:center;${cur?'outline:3px solid '+col+'55;outline-offset:1px;':''}">${idx}</div>`});
-        const pop=`<div class="pop"><b>${idx}. ${st.fl} ${b.c}</b>${cur?' <span style="color:var(--acc-d);font-weight:700">· ici</span>':''}
-          <div class="pm">${st.nm} · ${b.dd||fmtRange(st)}</div>
+        const pop=`<div class="pop"><b>${idx}. ${htmlText(st.fl)} ${htmlText(b.c)}</b>${cur?' <span style="color:var(--acc-d);font-weight:700">· ici</span>':''}
+          <div class="pm">${htmlText(st.nm)} · ${htmlText(b.dd||fmtRange(st))}</div>
           <a href="https://www.google.com/maps/search/?api=1&query=${b.co[0]},${b.co[1]}" target="_blank" rel="noopener" style="font-size:12px;display:inline-block;margin-top:5px">Ouvrir dans Google Maps ↗</a><br>
           <a href="#" onclick="gotoStage('${st.id}');return false;" style="font-size:12px;display:inline-block;margin-top:3px">Voir l'étape dans l'itinéraire →</a></div>`;
-        L.marker(b.co,{icon,riseOnHover:true}).addTo(citiesLayer).bindPopup(pop).bindTooltip(b.c);
+        L.marker(b.co,{icon,riseOnHover:true}).addTo(citiesLayer).bindPopup(pop).bindTooltip(htmlText(b.c));
       }
       if(b.spots)b.spots.forEach(sp=>{const so=(typeof sp==='string')?{n:sp}:sp;const n=so.n;if(added[n])return;const co=SPOT_CO[n];if(!co)return;added[n]=1;
         const m=L.marker(co,{icon:spotIcon(col,isWished(n),n)}).bindPopup(spotPopup(st,b,so),{maxWidth:250});
@@ -1260,7 +1267,7 @@ function initMap(){
     if(pts.length)prevEnd=pts[pts.length-1];
   });
   let lg='<span style="flex-basis:100%;color:var(--muted);font-size:11px">Chiffres = villes (ordre du voyage) · <b>zoome</b> pour voir les lieux (🛕🏖️…) et restos (🍜) · ⭐ = favori · pointillés = vols</span>';
-  BUDGET_PREVU.filter(b=>CFLAG[b.id]).forEach(b=>{lg+=`<span><i style="background:${CFLAG[b.id]}"></i>${b.fl} ${b.nm}</span>`;});
+  BUDGET_PREVU.filter(b=>CFLAG[b.id]).forEach(b=>{lg+=`<span><i style="background:${CFLAG[b.id]}"></i>${htmlText(b.fl)} ${htmlText(b.nm)}</span>`;});
   $('#legend').innerHTML=lg;
   mapWishOnly=false;mapFiltersOpen=false;const categoryIds=MAP_CATEGORIES.filter(c=>c.id!=='all').map(c=>c.id);try{const saved=JSON.parse(localStorage.getItem('td_map_categories_'+TRIP));mapCategories=new Set(Array.isArray(saved)?saved.filter(id=>categoryIds.includes(id)):categoryIds);}catch(e){mapCategories=new Set(categoryIds);}applySpotFilter();buildMapCtrl();
   map.on('zoomend',updateSpotsVis);
@@ -1283,13 +1290,13 @@ function openExpense(){
     <select id="e-cur" onchange="updateEurPreview();updateExpenseFor()">${CURRENCIES.map(c=>`<option value="${c.c}" ${c.c===expSel.cur?'selected':''}>${c.s} ${c.c} — ${c.nm}</option>`).join('')}</select>
     <label class="fl-l">Montant total payé (dans la devise)</label><input id="e-amt" type="number" inputmode="decimal" placeholder="0" step="0.01" oninput="updateEurPreview();updateExpenseFor()">
     <div id="e-eur" style="font-size:12.5px;color:var(--sage-d);font-weight:700;margin:6px 2px 0"></div>
-    <label class="fl-l">Payé par</label><div class="chips" id="e-by">${PAYERS.map(p=>`<button class="chip ${p.id===expSel.by?'on':''}" data-c="${p.id}" onclick="pickBy('${p.id}')">${p.em} ${p.nm}</button>`).join('')}</div>
+    <label class="fl-l">Payé par</label><div class="chips" id="e-by">${PAYERS.map(p=>`<button class="chip ${p.id===expSel.by?'on':''}" data-c="${p.id}" onclick="pickBy('${p.id}')">${p.em} ${htmlText(p.nm)}</button>`).join('')}</div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px"><label class="fl-l" style="margin:0">Diviser</label><span style="font-size:12px;color:var(--muted)">Également entre les personnes cochées</span></div>
     <div class="card" id="e-for" style="margin-top:8px">${expenseForRows()}</div>
     <div id="e-share" style="font-size:12px;color:var(--muted);margin-top:6px">Le montant est partagé à moitié entre Marie et Baptiste.</div>
     <label class="fl-l">Description</label><input id="e-label" placeholder="Ex : guesthouse Yangshuo…">
     <label class="fl-l">Catégorie</label><div class="chips" id="e-cats">${CATS.map(c=>`<button class="chip ${c.id===expSel.cat?'on':''}" data-c="${c.id}" onclick="pickCat('${c.id}')">${c.fl} ${c.nm}</button>`).join('')}</div>
-    <label class="fl-l">Pays / poste</label><div class="chips" id="e-cty">${BUDGET_PREVU.map(b=>`<button class="chip ${b.id===expSel.country?'on':''}" data-c="${b.id}" onclick="pickCty('${b.id}')">${b.fl} ${b.nm.split(' ')[0]}</button>`).join('')}</div>
+    <label class="fl-l">Pays / poste</label><div class="chips" id="e-cty">${BUDGET_PREVU.map(b=>`<button class="chip ${b.id===expSel.country?'on':''}" data-c="${b.id}" onclick="pickCty('${b.id}')">${htmlText(b.fl)} ${htmlText(b.nm.split(' ')[0])}</button>`).join('')}</div>
     <label class="fl-l">Date</label><input id="e-date" type="date" value="${d}">
     <label class="fl-l">Reçu (photo, optionnel)</label>
     <input id="e-recu" type="file" accept="image/*" capture="environment" onchange="handleReceipt(this)">
@@ -1312,14 +1319,14 @@ function handleReceipt(input){
 function clearReceipt(){expSel.receipt=null;const pv=$('#e-recu-prev');if(pv)pv.innerHTML='';const inp=$('#e-recu');if(inp)inp.value='';}
 function viewReceipt(id){const e=S.expenses.find(x=>x.id===id);if(!e||!e.receipt)return;
   $('#modal').innerHTML=`<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="sheet" style="text-align:center">
-    <div class="grabber"></div><h3>🧾 Reçu</h3><img src="${e.receipt}" style="max-width:100%;border-radius:12px;border:1px solid var(--line)">
+    <div class="grabber"></div><h3>🧾 Reçu</h3><img src="${htmlText(TravelSecurity.imageURL(e.receipt))}" style="max-width:100%;border-radius:12px;border:1px solid var(--line)">
     <button class="btn ghost" onclick="closeModal()">Fermer</button></div></div>`;
 }
 function currentCountry(){const t=today();for(const st of STAGES){if(t>=pd(st.start)&&t<pd(st.end))return st.id;}return null;}
 function pickCat(id){expSel.cat=id;document.querySelectorAll('#e-cats .chip').forEach(c=>c.classList.toggle('on',c.dataset.c===id));}
 function pickCty(id){expSel.country=id;document.querySelectorAll('#e-cty .chip').forEach(c=>c.classList.toggle('on',c.dataset.c===id));
   const sel=$('#e-cur');if(sel&&COUNTRY_CUR[id]){sel.value=COUNTRY_CUR[id];updateEurPreview();}}
-function expenseForRows(){const amt=Math.max(0,parseFloat($('#e-amt')?.value)||0),cur=$('#e-cur')?.value||expSel.cur||'EUR';return PAYERS.map(p=>{const checked=expSel.for==='both'||expSel.for===p.id;const share=checked?amt/(expSel.for==='both'?2:1):0;return `<label style="display:flex;align-items:center;gap:12px;padding:14px 12px;border-bottom:1px solid var(--line);cursor:pointer"><input type="checkbox" style="width:20px;height:20px;margin:0;accent-color:var(--acc)" ${checked?'checked':''} onchange="toggleExpenseFor('${p.id}')"><span style="flex:1">${p.nm}${p.id===meAsPayer()?' (moi)':''}</span><strong>${share.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})} ${cur==='EUR'?'€':cur}</strong></label>`;}).join('');}
+function expenseForRows(){const amt=Math.max(0,parseFloat($('#e-amt')?.value)||0),cur=$('#e-cur')?.value||expSel.cur||'EUR';return PAYERS.map(p=>{const checked=expSel.for==='both'||expSel.for===p.id;const share=checked?amt/(expSel.for==='both'?2:1):0;return `<label style="display:flex;align-items:center;gap:12px;padding:14px 12px;border-bottom:1px solid var(--line);cursor:pointer"><input type="checkbox" style="width:20px;height:20px;margin:0;accent-color:var(--acc)" ${checked?'checked':''} onchange="toggleExpenseFor('${p.id}')"><span style="flex:1">${htmlText(p.nm)}${p.id===meAsPayer()?' (moi)':''}</span><strong>${share.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})} ${cur==='EUR'?'€':cur}</strong></label>`;}).join('');}
 function updateExpenseFor(){const rows=$('#e-for'),info=$('#e-share');if(rows)rows.innerHTML=expenseForRows();if(info)info.textContent=expSel.for==='both'?'Le montant est partagé à moitié entre Marie et Baptiste.':expSel.for===expSel.by?'Dépense personnelle : aucun remboursement à l’autre personne.':payerName(expSel.for)+' doit rembourser la totalité à '+payerName(expSel.by)+'.';}
 function toggleExpenseFor(id){if(!PAYERS.some(p=>p.id===id))return;if(expSel.for==='both')expSel.for=otherPayer(id);else if(expSel.for===id){toast('Garde au moins une personne cochée');}else expSel.for='both';updateExpenseFor();}
 function pickBy(id){expSel.by=id;document.querySelectorAll('#e-by .chip').forEach(c=>c.classList.toggle('on',c.dataset.c===id));updateExpenseFor();}
@@ -1347,23 +1354,23 @@ function openData(){
 }
 function exportData(){const blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);a.download='tour-asie-sauvegarde-'+new Date().toISOString().slice(0,10)+'.json';a.click();toast('✓ Sauvegarde exportée');}
-function importData(ev){const f=ev.target.files[0];if(!f)return;const r=new FileReader();
-  r.onload=()=>{try{const d=JSON.parse(r.result);S={days:d.days||{},blocks:d.blocks||{},check:d.check||{},expenses:d.expenses||[],reminders:d.reminders||{},flights:d.flights||[],photos:d.photos||{},rates:d.rates||{},wishlist:d.wishlist||{},settlements:d.settlements||[]};save();closeModal();renderAll();toast('✓ Sauvegarde importée');}catch(e){toast('⚠️ Fichier invalide');}};r.readAsText(f);}
+function importData(ev){const f=ev.target.files[0];if(!f)return;if(f.size>8*1024*1024){toast('Sauvegarde trop volumineuse');return;}const r=new FileReader();
+  r.onload=()=>{try{const d=TravelSecurity.validateState(JSON.parse(r.result));S={days:d.days||{},blocks:d.blocks||{},check:d.check||{},expenses:d.expenses||[],reminders:d.reminders||{},flights:d.flights||[],photos:d.photos||{},rates:d.rates||{},wishlist:d.wishlist||{},settlements:d.settlements||[]};save();closeModal();renderAll();toast('✓ Sauvegarde importée');}catch(e){toast('⚠️ Fichier invalide');}};r.readAsText(f);}
 function resetData(){if(confirm('Effacer toutes tes données ?')){S={days:{},blocks:{},check:{},expenses:[],reminders:{},flights:[],photos:{},rates:{},wishlist:{},settlements:[]};save();closeModal();renderAll();toast('Données réinitialisées');}}
 
 /* ============ INIT ============ */
 function guideHtml(st){
   if(!st.guide)return '';
-  return `<div class="prat folded" style="border-left-color:var(--blue-d)"><div class="prat-h" onclick="this.parentNode.classList.toggle('folded')">📖 Guide pratique<span class="rchev">▾</span></div><div class="prat-body"><div class="prat-row" style="border-top:none"><div>${st.guide}</div></div></div></div>`;
+  return `<div class="prat folded" style="border-left-color:var(--blue-d)"><div class="prat-h" onclick="this.parentNode.classList.toggle('folded')">📖 Guide pratique<span class="rchev">▾</span></div><div class="prat-body"><div class="prat-row" style="border-top:none"><div>${richHTML(st.guide)}</div></div></div></div>`;
 }
 function renderGuide(){
   const el=$('#v-guide'); if(!el)return;
   if(!STAGES.length){el.innerHTML='<div class="empty">Choisis un voyage pour voir les infos pratiques.</div>';return;}
   let html=`<div class="sec-title">Mode d’emploi du voyage</div>${handbookHtml()}<div class="sec-title">Infos pratiques & guides — par pays</div>`;
   STAGES.forEach(st=>{
-    html+=`<div style="margin-bottom:16px"><div style="font-family:var(--disp);font-weight:700;font-size:19px;color:var(--ink);margin:2px 2px 8px">${st.fl} ${st.nm}</div>${guideHtml(st)}${pratiqueHtml(st)}</div>`;
+    html+=`<div style="margin-bottom:16px"><div style="font-family:var(--disp);font-weight:700;font-size:19px;color:var(--ink);margin:2px 2px 8px">${htmlText(st.fl)} ${htmlText(st.nm)}</div>${guideHtml(st)}${pratiqueHtml(st)}</div>`;
   });
-  if(HANDBOOK.sources?.length)html+=handbookPanel('🔎 Sources et informations à revalider',[["Mise à jour",HANDBOOK.updated||''],...HANDBOOK.sources.map(x=>[x[0],`<a href="${x[1]}" target="_blank" rel="noopener">Ouvrir la source officielle</a>`])]);
+  if(HANDBOOK.sources?.length)html+=handbookPanel('🔎 Sources et informations à revalider',[["Mise à jour",HANDBOOK.updated||''],...HANDBOOK.sources.map(x=>[x[0],`<a href="${htmlText(TravelSecurity.linkURL(x[1]))}" target="_blank" rel="noopener">Ouvrir la source officielle</a>`])]);
   el.innerHTML=html;
 }
 let reminderLinkOpened=false;
