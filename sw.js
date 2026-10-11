@@ -2,7 +2,7 @@
    1) Notifications push (appli fermée)
    2) Mode hors-ligne : met en cache l'appli + ses ressources pour consulter sans réseau */
 importScripts('security.js');
-const CACHE = 'voyages-v20';
+const CACHE = 'voyages-v21';
 
 /* Ressources internes (même domaine) */
 const CORE = [
