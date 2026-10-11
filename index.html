@@ -632,7 +632,7 @@ function openSync(){
 /* ============ APPLI INSTALLABLE + NOTIFICATIONS PUSH ============ */
 const VAPID_PUBLIC="BJrHrykUoHRgXFQHcJz03DBSvokJG43YUoATcuppRHl4FRBZU8nNlhd-YR6RAj5ckn49YPs17xa81rFj7lLul9s";
 let swReg=null,deferredInstall=null;
-const OFFLINE_CACHE='voyages-v19';
+const OFFLINE_CACHE='voyages-v20';
 const OFFLINE_FILES=['./','index.html','manifest.json','vols.html','icon-192.png','icon-512.png','apple-touch-icon.png','security.js','vendor/dompurify-3.4.16.min.js','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js'];
 async function prepareOffline(){
   const btn=$('#offline-prepare'),status=$('#offline-status');
@@ -656,7 +656,7 @@ function isStandalone(){return window.matchMedia('(display-mode: standalone)').m
 function isiOS(){return /iphone|ipad|ipod/i.test(navigator.userAgent);}
 function pushSupported(){return('serviceWorker'in navigator)&&('PushManager'in window)&&('Notification'in window);}
 function initPWA(){
-  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js?v=20261011-budget-details',{updateViaCache:'none'}).then(r=>{swReg=r;r.update().catch(()=>{});}).catch(()=>{});}
+  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js?v=20261011-budget-categories',{updateViaCache:'none'}).then(r=>{swReg=r;r.update().catch(()=>{});}).catch(()=>{});}
   window.addEventListener('beforeinstallprompt',ev=>{ev.preventDefault();deferredInstall=ev;});
   window.addEventListener('offline',()=>setSyncPill('off'));
   window.addEventListener('online',()=>{if(SYNC.user){bootTrips();if(syncActive())pushCloud(true);}fetchRates(true);});
@@ -671,7 +671,7 @@ async function enablePush(){
   if(isiOS()&&!isStandalone()){toast("iPhone : ajoute d'abord à l'écran d'accueil, puis rouvre depuis l'icône");return;}
   if(!pushSupported()){toast('Notifications non supportées sur ce navigateur');return;}
   try{
-    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js?v=20261011-budget-details',{updateViaCache:'none'});
+    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js?v=20261011-budget-categories',{updateViaCache:'none'});
     await navigator.serviceWorker.ready;
     const perm=await Notification.requestPermission();
     if(perm!=='granted'){toast('Notifications refusées dans les réglages');return;}
@@ -989,7 +989,7 @@ function fetchRates(force){
   }).catch(()=>{if(force)toast('Actualisation impossible (hors-ligne ?)');});
 }
 const budgetOpenCountries=new Set();
-const budgetCategoryFilters=new Map();
+const budgetOpenCategories=new Set();
 function budgetMoney(value){return Number(value).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';}
 function budgetExpenseRows(expenses){
   return [...expenses].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||b.id-a.id).map(e=>{
@@ -1002,17 +1002,16 @@ function budgetExpenseRows(expenses){
       <button class="del" onclick="delExpense(${TravelSecurity.numericId(e.id)})" aria-label="Supprimer la dépense">✕</button></div>`;
   }).join('');
 }
-function filterCountryExpenses(id,category){budgetCategoryFilters.set(id,category);renderBudget();}
 function budgetCountryDetails(b){
   const expenses=S.expenses.filter(e=>e.country===b.id),total=expenses.reduce((a,e)=>a+toEur(e),0);
-  const category=budgetCategoryFilters.get(b.id)||'all',filtered=expenses.filter(e=>category==='all'||e.cat===category);
-  const subtotal=filtered.reduce((a,e)=>a+toEur(e),0);
-  return `<div class="budget-detail" style="padding:0 4px 12px"><div class="info">${expenses.length} dépense(s) · Total ${budgetMoney(total)}<br>${total>b.v?'Dépassement : '+budgetMoney(total-b.v):'Budget restant : '+budgetMoney(b.v-total)}<br>${PAYERS.map(p=>p.nm+' a payé '+budgetMoney(expenses.filter(e=>(e.by||'marie')===p.id).reduce((a,e)=>a+toEur(e),0))).join(' · ')}</div>
-    ${CATS.map(c=>{const amount=expenses.filter(e=>e.cat===c.id).reduce((a,e)=>a+toEur(e),0);return amount?`<div class="cat-line"><span>${c.fl} ${c.nm}</span><strong style="margin-left:auto">${budgetMoney(amount)}</strong></div>`:'';}).join('')}
-    <label class="fl-l" for="budget-filter-${htmlText(b.id)}">Afficher les dépenses</label>
-    <select id="budget-filter-${htmlText(b.id)}" onchange="filterCountryExpenses('${TravelSecurity.inlineString(b.id)}',this.value)"><option value="all">Toutes les catégories</option>${CATS.map(c=>`<option value="${c.id}" ${category===c.id?'selected':''}>${c.fl} ${c.nm}</option>`).join('')}</select>
-    <div class="pmeta" style="margin:12px 0">${filtered.length} dépense(s) · ${budgetMoney(subtotal)} · plus récentes en premier</div>
-    ${filtered.length?budgetExpenseRows(filtered):'<div class="empty">Aucune dépense dans cette sélection.</div>'}
+  return `<div class="budget-detail" style="padding:0 4px 12px"><div class="info">${expenses.length} dépense(s) · Total ${budgetMoney(total)}<br>${total>b.v?'Dépassement : '+budgetMoney(total-b.v):'Budget restant : '+budgetMoney(b.v-total)}</div>
+    <div class="pmeta" style="margin:12px 0">Ouvre une catégorie pour voir ses dépenses.</div>
+    ${CATS.map(c=>{
+      const rows=expenses.filter(e=>(CATS.some(x=>x.id===e.cat)?e.cat:'autre')===c.id),amount=rows.reduce((a,e)=>a+toEur(e),0),key=b.id+':'+c.id;
+      return `<details class="budget-category" ${budgetOpenCategories.has(key)?'open':''} ontoggle="if(this.open)budgetOpenCategories.add('${TravelSecurity.inlineString(key)}');else budgetOpenCategories.delete('${TravelSecurity.inlineString(key)}')">
+        <summary style="cursor:pointer;padding:13px 0;border-top:1px solid var(--line)">${c.fl} <b>${c.nm}</b> · <strong>${budgetMoney(amount)}</strong><span style="display:block;margin:5px 0 0 22px;font-size:12px;color:var(--muted)">${rows.length} dépense(s)</span></summary>
+        ${rows.length?budgetExpenseRows(rows):'<div class="empty">Aucune dépense dans cette catégorie.</div>'}</details>`;
+    }).join('')}
     <div style="font-size:11px;color:var(--muted);margin-top:8px">Conversions et parts en euros selon les taux de change actuels du carnet.</div></div>`;
 }
 function renderBudget(){
