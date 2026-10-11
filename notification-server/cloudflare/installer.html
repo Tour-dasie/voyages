@@ -1,0 +1,596 @@
+<!doctype html><html lang="fr"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Programme Tour d’Asie à copier</title><style>body{font:18px system-ui;max-width:850px;margin:24px auto;padding:16px}button{padding:16px;background:#0868bd;color:white;border:0;border-radius:12px;font:inherit}textarea{display:block;box-sizing:border-box;width:100%;height:55vh;margin-top:20px;font:12px monospace}#status{min-height:2em}</style><h1>Programme Cloudflare</h1><p>Appuie sur <b>Copier tout le programme</b>, puis retourne dans Cloudflare, sélectionne tout le contenu de <b>worker.js</b> et remplace-le par ce programme. Appuie ensuite sur <b>Déployer</b>.</p><p>Le programme s’installe avec les envois désactivés. Il restera à connecter le stockage, les clés de notification et vérifier la sécurité avant activation.</p><button id="copy">Copier tout le programme</button><p id="status" role="status"></p><textarea id="code" readonly spellcheck="false">/* Tour d’Asie — Worker Cloudflare, 11 octobre 2026.
+Fichier autonome : remplacer tout worker.js par ce texte.
+Aucun mot de passe à écrire dans ce fichier. Les secrets restent dans Cloudflare.
+INSTALLATION SEULE : aucun envoi tant que configuration et revue de sécurité ne sont pas terminées.
+Inclut @block65/webcrypto-web-push 2.0.0 :
+Copyright 2024 Block65 Pte Ltd
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the &quot;Software&quot;), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+*/
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __commonJS = (cb, mod) =&gt; function __require() {
+  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+};
+var __copyProps = (to, from, except, desc) =&gt; {
+  if (from &amp;&amp; typeof from === &quot;object&quot; || typeof from === &quot;function&quot;) {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) &amp;&amp; key !== except)
+        __defProp(to, key, { get: () =&gt; from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) =&gt; (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. &quot;__esModule&quot; has not been set), then set
+  // &quot;default&quot; to the CommonJS &quot;module.exports&quot; for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, &quot;default&quot;, { value: mod, enumerable: true }) : target,
+  mod
+));
+
+// ../site-source/notification-server/functions/planner.js
+var require_planner = __commonJS({
+  &quot;../site-source/notification-server/functions/planner.js&quot;(exports, module) {
+    &quot;use strict&quot;;
+    var ZONES = { cn: &quot;Asia/Shanghai&quot;, jp: &quot;Asia/Tokyo&quot;, th: &quot;Asia/Bangkok&quot;, kh: &quot;Asia/Phnom_Penh&quot;, vn: &quot;Asia/Ho_Chi_Minh&quot;, la: &quot;Asia/Vientiane&quot;, pi: &quot;Asia/Manila&quot; };
+    function localClock(now, zone) {
+      const parts = new Intl.DateTimeFormat(&quot;en-CA&quot;, { timeZone: zone, year: &quot;numeric&quot;, month: &quot;2-digit&quot;, day: &quot;2-digit&quot;, hour: &quot;2-digit&quot;, hourCycle: &quot;h23&quot; }).formatToParts(now);
+      const p = Object.fromEntries(parts.map((x) =&gt; [x.type, x.value]));
+      return { date: `${p.year}-${p.month}-${p.day}`, hour: Number(p.hour) };
+    }
+    function timezoneFor(content, device, now) {
+      if (device.followItinerary === false) {
+        try {
+          localClock(now, device.timezone);
+          return device.timezone;
+        } catch {
+          return &quot;Europe/Paris&quot;;
+        }
+      }
+      let date = now.toISOString().slice(0, 10), zone = &quot;Europe/Paris&quot;;
+      for (let i = 0; i &lt; 2; i++) {
+        const stages = (content.STAGES || []).filter((s) =&gt; s.start &lt;= date &amp;&amp; date &lt; s.end);
+        const current = stages.at(-1);
+        zone = current ? ZONES[current.id] || &quot;Europe/Paris&quot; : &quot;Europe/Paris&quot;;
+        date = localClock(now, zone).date;
+      }
+      return zone;
+    }
+    function reminderHour(r) {
+      if (Number.isInteger(r.notificationHour) &amp;&amp; r.notificationHour &gt;= 0 &amp;&amp; r.notificationHour &lt;= 23) return r.notificationHour;
+      if (/_matin$/.test(r.id)) return 8;
+      if (/_budget$/.test(r.id)) return 20;
+      if (/_soir$/.test(r.id)) return 21;
+      return 9;
+    }
+    function audience(r) {
+      if (r.audience) return r.audience;
+      if (r.id === &quot;todo_bag_marie&quot;) return &quot;marie&quot;;
+      if (r.id === &quot;todo_bag_baptiste&quot;) return &quot;baptiste&quot;;
+      return &quot;both&quot;;
+    }
+    function allowedEndpoint(url) {
+      try {
+        const u = new URL(url);
+        return u.protocol === &quot;https:&quot; &amp;&amp; !u.username &amp;&amp; !u.password &amp;&amp; [&quot;fcm.googleapis.com&quot;, &quot;updates.push.services.mozilla.com&quot;, &quot;web.push.apple.com&quot;].some((h) =&gt; u.hostname === h || u.hostname.endsWith(&quot;.&quot; + h));
+      } catch {
+        return false;
+      }
+    }
+    function dueReminders2(content, state, device, now) {
+      const zone = timezoneFor(content, device, now), clock = localClock(now, zone);
+      if (clock.hour &gt;= 23) return [];
+      return (content.REMINDERS || []).filter((r) =&gt; r.date === clock.date &amp;&amp; !state.reminders?.[r.id] &amp;&amp; clock.hour &gt;= reminderHour(r) &amp;&amp; (audience(r) === &quot;both&quot; || audience(r) === device.owner)).sort((a, b) =&gt; reminderHour(a) - reminderHour(b) || a.id.localeCompare(b.id));
+    }
+    function notificationPayload2(r, trip) {
+      return { title: `${r.icon || &quot;\u{1F514}&quot;} ${r.t}`, body: String(r.s || &quot;&quot;).replace(/&lt;[^&gt;]*&gt;/g, &quot; &quot;).slice(0, 1600), tag: `${trip}-${r.id}`, url: `https://tour-dasie.github.io/voyages/?reminder=${encodeURIComponent(r.id)}&amp;trip=${encodeURIComponent(trip)}` };
+    }
+    module.exports = { localClock, timezoneFor, reminderHour, audience, allowedEndpoint, dueReminders: dueReminders2, notificationPayload: notificationPayload2 };
+  }
+});
+
+// node_modules/uint8array-extras/index.js
+var objectToString = Object.prototype.toString;
+var uint8ArrayStringified = &quot;[object Uint8Array]&quot;;
+var arrayBufferStringified = &quot;[object ArrayBuffer]&quot;;
+function isType(value, typeConstructor, typeStringified) {
+  if (!value) {
+    return false;
+  }
+  if (value.constructor === typeConstructor) {
+    return true;
+  }
+  return objectToString.call(value) === typeStringified;
+}
+function isUint8Array(value) {
+  return isType(value, Uint8Array, uint8ArrayStringified);
+}
+function isArrayBuffer(value) {
+  return isType(value, ArrayBuffer, arrayBufferStringified);
+}
+function isUint8ArrayOrArrayBuffer(value) {
+  return isUint8Array(value) || isArrayBuffer(value);
+}
+function toUint8ArrayIfArrayBuffer(value) {
+  return isArrayBuffer(value) ? new Uint8Array(value) : value;
+}
+function assertUint8ArrayOrArrayBuffer(value) {
+  if (!isUint8ArrayOrArrayBuffer(value)) {
+    throw new TypeError(`Expected \`Uint8Array\` or \`ArrayBuffer\`, got \`${typeof value}\``);
+  }
+}
+function toUint8Array(value) {
+  if (value instanceof ArrayBuffer) {
+    return new Uint8Array(value);
+  }
+  if (ArrayBuffer.isView(value)) {
+    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+  }
+  throw new TypeError(`Unsupported value, got \`${typeof value}\`.`);
+}
+function concatUint8Arrays(arrays, totalLength) {
+  if (arrays.length === 0) {
+    return new Uint8Array(0);
+  }
+  totalLength ??= arrays.reduce((accumulator, currentValue) =&gt; accumulator + currentValue.byteLength, 0);
+  const returnValue = new Uint8Array(totalLength);
+  let offset = 0;
+  for (let array of arrays) {
+    assertUint8ArrayOrArrayBuffer(array);
+    array = toUint8ArrayIfArrayBuffer(array);
+    returnValue.set(array, offset);
+    offset += array.length;
+  }
+  return returnValue;
+}
+var cachedDecoders = {
+  utf8: new globalThis.TextDecoder(&quot;utf8&quot;)
+};
+function assertString(value) {
+  if (typeof value !== &quot;string&quot;) {
+    throw new TypeError(`Expected \`string\`, got \`${typeof value}\``);
+  }
+}
+var cachedEncoder = new globalThis.TextEncoder();
+function stringToUint8Array(string) {
+  assertString(string);
+  return cachedEncoder.encode(string);
+}
+function base64ToBase64Url(base64) {
+  return base64.replaceAll(&quot;+&quot;, &quot;-&quot;).replaceAll(&quot;/&quot;, &quot;_&quot;).replace(/=+$/, &quot;&quot;);
+}
+function base64UrlToBase64(base64url) {
+  const base64 = base64url.replaceAll(&quot;-&quot;, &quot;+&quot;).replaceAll(&quot;_&quot;, &quot;/&quot;);
+  const padding = (4 - base64.length % 4) % 4;
+  return base64 + &quot;=&quot;.repeat(padding);
+}
+var MAX_BLOCK_SIZE = 65535;
+function uint8ArrayToBase64(array, { urlSafe = false } = {}) {
+  assertUint8ArrayOrArrayBuffer(array);
+  array = toUint8ArrayIfArrayBuffer(array);
+  let base64 = &quot;&quot;;
+  for (let index = 0; index &lt; array.length; index += MAX_BLOCK_SIZE) {
+    const chunk = array.subarray(index, index + MAX_BLOCK_SIZE);
+    base64 += globalThis.btoa(String.fromCodePoint.apply(void 0, chunk));
+  }
+  return urlSafe ? base64ToBase64Url(base64) : base64;
+}
+function base64ToUint8Array(base64String) {
+  assertString(base64String);
+  return Uint8Array.from(globalThis.atob(base64UrlToBase64(base64String)), (x) =&gt; x.codePointAt(0));
+}
+var byteToHexLookupTable = Array.from({ length: 256 }, (_, index) =&gt; index.toString(16).padStart(2, &quot;0&quot;));
+
+// node_modules/@block65/webcrypto-web-push/dist/lib/utils.js
+function encodeRecordSize(size) {
+  const bytes = new Uint8Array(4);
+  new DataView(bytes.buffer).setUint32(0, size);
+  return bytes;
+}
+function invariant(condition, message) {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
+
+// node_modules/@block65/webcrypto-web-push/dist/lib/client-keys.js
+async function deriveClientKeys(sub) {
+  const bytes = base64ToUint8Array(sub.keys.p256dh);
+  const authSecretBytes = base64ToUint8Array(sub.keys.auth);
+  invariant(bytes.byteLength === 65 &amp;&amp; bytes[0] === 4, &quot;Subscription p256dh is not an uncompressed P-256 point&quot;);
+  invariant(authSecretBytes.byteLength === 16, &quot;Subscription auth secret is not 16 bytes&quot;);
+  return {
+    publicKeyBytes: bytes,
+    publicKey: await crypto.subtle.importKey(&quot;raw&quot;, bytes, {
+      name: &quot;ECDH&quot;,
+      namedCurve: &quot;P-256&quot;
+    }, false, []),
+    authSecretBytes
+  };
+}
+
+// node_modules/@block65/webcrypto-web-push/dist/lib/hkdf.js
+function createHMAC(data) {
+  const keyPromise = crypto.subtle.importKey(&quot;raw&quot;, data, {
+    name: &quot;HMAC&quot;,
+    hash: &quot;SHA-256&quot;
+  }, false, [&quot;sign&quot;]);
+  return {
+    hash: async (input) =&gt; {
+      const k = await keyPromise;
+      return crypto.subtle.sign(&quot;HMAC&quot;, k, input);
+    }
+  };
+}
+async function hkdf(salt, ikm) {
+  const prkhPromise = createHMAC(salt).hash(ikm).then((prk) =&gt; createHMAC(prk));
+  return {
+    extract: async (info, len) =&gt; {
+      const prkh = await prkhPromise;
+      const blocks = await Array.from({ length: Math.ceil(len / 32) }, (_, i) =&gt; i).reduce(async (acc, i) =&gt; {
+        const previous = await acc;
+        const hash = await prkh.hash(new Uint8Array([...previous.at(-1) ?? [], ...info, i + 1]));
+        return [...previous, new Uint8Array(hash)];
+      }, Promise.resolve([]));
+      return concatUint8Arrays(blocks).slice(0, len);
+    }
+  };
+}
+
+// node_modules/@block65/webcrypto-web-push/dist/lib/info.js
+function createKeyInfo(clientPublic, serverPublic) {
+  return new Uint8Array([
+    ...stringToUint8Array(&quot;WebPush: info\0&quot;),
+    ...clientPublic,
+    ...serverPublic
+  ]);
+}
+function createInfo(type) {
+  return stringToUint8Array(`Content-Encoding: ${type}\0`);
+}
+
+// node_modules/@block65/webcrypto-web-push/dist/lib/local-keys.js
+async function generateLocalKeys() {
+  const keyPair = await crypto.subtle.generateKey({
+    name: &quot;ECDH&quot;,
+    namedCurve: &quot;P-256&quot;
+  }, false, [&quot;deriveBits&quot;]);
+  return {
+    privateKey: keyPair.privateKey,
+    publicKeyBytes: new Uint8Array(await crypto.subtle.exportKey(&quot;raw&quot;, keyPair.publicKey))
+  };
+}
+
+// node_modules/@block65/webcrypto-web-push/dist/lib/salt.js
+async function getSalt() {
+  return crypto.getRandomValues(new Uint8Array(16));
+}
+
+// node_modules/@block65/webcrypto-web-push/dist/lib/encrypt.js
+var recordSize = 4096;
+var headerSize = 21 + 65;
+var maxPlaintextSize = recordSize - headerSize - 17;
+async function encryptNotification(subscription, plaintext, options = {}) {
+  invariant(plaintext.byteLength &lt;= maxPlaintextSize, `Payload is ${plaintext.byteLength} bytes, the maximum is ${maxPlaintextSize}`);
+  const clientKeys = await deriveClientKeys(subscription);
+  const salt = await getSalt();
+  const localKeys = await generateLocalKeys();
+  const sharedSecret = await crypto.subtle.deriveBits({
+    name: &quot;ECDH&quot;,
+    public: clientKeys.publicKey
+  }, localKeys.privateKey, 256);
+  const keyInfo = createKeyInfo(clientKeys.publicKeyBytes, localKeys.publicKeyBytes);
+  const cekInfo = createInfo(&quot;aes128gcm&quot;);
+  const nonceInfo = createInfo(&quot;nonce&quot;);
+  const ikmHkdf = await hkdf(clientKeys.authSecretBytes, sharedSecret);
+  const ikm = await ikmHkdf.extract(keyInfo, 32);
+  const messageHkdf = await hkdf(salt, ikm);
+  const cekBytes = await messageHkdf.extract(cekInfo, 16);
+  const nonceBytes = await messageHkdf.extract(nonceInfo, 12);
+  const cekCryptoKey = await crypto.subtle.importKey(&quot;raw&quot;, cekBytes, {
+    name: &quot;AES-GCM&quot;,
+    length: 128
+  }, false, [&quot;encrypt&quot;]);
+  const padTo = options.pad ?? true ? maxPlaintextSize : plaintext.byteLength;
+  const padded = new Uint8Array(padTo + 1);
+  padded.set(plaintext);
+  padded[plaintext.byteLength] = 2;
+  const encrypted = await crypto.subtle.encrypt({
+    name: &quot;AES-GCM&quot;,
+    iv: nonceBytes
+  }, cekCryptoKey, padded);
+  return new Uint8Array([
+    ...salt,
+    ...encodeRecordSize(recordSize),
+    localKeys.publicKeyBytes.byteLength,
+    ...localKeys.publicKeyBytes,
+    ...new Uint8Array(encrypted)
+  ]);
+}
+
+// node_modules/@block65/webcrypto-web-push/dist/lib/base64.js
+function encodeBase64Url(value) {
+  return uint8ArrayToBase64(toUint8Array(value), { urlSafe: true });
+}
+function objectToBase64Url(obj) {
+  return encodeBase64Url(stringToUint8Array(JSON.stringify(obj)));
+}
+
+// node_modules/@block65/webcrypto-web-push/dist/lib/jwt.js
+async function sign(payload, key) {
+  const headerStr = objectToBase64Url({
+    typ: &quot;JWT&quot;,
+    alg: &quot;ES256&quot;
+  });
+  const payloadStr = objectToBase64Url({
+    iat: Math.floor(Date.now() / 1e3),
+    ...payload
+  });
+  const dataStr = `${headerStr}.${payloadStr}`;
+  const signature = await crypto.subtle.sign({
+    name: &quot;ECDSA&quot;,
+    hash: &quot;SHA-256&quot;
+  }, key, stringToUint8Array(dataStr));
+  return `${dataStr}.${encodeBase64Url(signature)}`;
+}
+
+// node_modules/@block65/webcrypto-web-push/dist/lib/vapid.js
+async function vapidHeaders(subscription, vapid) {
+  invariant(vapid.subject, &quot;Vapid subject is empty&quot;);
+  invariant(vapid.privateKey, &quot;Vapid private key is empty&quot;);
+  invariant(vapid.publicKey, &quot;Vapid public key is empty&quot;);
+  const endpoint = new URL(subscription.endpoint);
+  invariant(endpoint.protocol === &quot;https:&quot;, `Subscription endpoint is not https: ${endpoint.protocol}`);
+  const vapidPublicKeyBytes = base64ToUint8Array(vapid.publicKey);
+  const publicKey = await crypto.subtle.importKey(&quot;jwk&quot;, {
+    kty: &quot;EC&quot;,
+    crv: &quot;P-256&quot;,
+    x: encodeBase64Url(vapidPublicKeyBytes.slice(1, 33)),
+    y: encodeBase64Url(vapidPublicKeyBytes.slice(33, 65)),
+    d: vapid.privateKey
+  }, {
+    name: &quot;ECDSA&quot;,
+    namedCurve: &quot;P-256&quot;
+  }, false, [&quot;sign&quot;]);
+  const jwt = await sign({
+    aud: endpoint.origin,
+    exp: Math.floor(Date.now() / 1e3) + 12 * 60 * 60,
+    sub: vapid.subject
+  }, publicKey);
+  return {
+    headers: {
+      authorization: `vapid t=${jwt}, k=${vapid.publicKey}`
+    }
+  };
+}
+
+// node_modules/@block65/webcrypto-web-push/dist/lib/payload.js
+async function buildPushPayload(message, subscription, vapid) {
+  const { headers } = await vapidHeaders(subscription, vapid);
+  const body = await encryptNotification(subscription, stringToUint8Array(
+    // if its a primitive, convert to string, otherwise stringify
+    typeof message.data === &quot;string&quot; || typeof message.data === &quot;number&quot; ? message.data.toString() : JSON.stringify(message.data)
+  ));
+  return {
+    headers: {
+      ...headers,
+      ttl: (message.options?.ttl || 60).toString(),
+      ...message.options?.urgency &amp;&amp; {
+        urgency: message.options.urgency
+      },
+      ...message.options?.topic &amp;&amp; {
+        topic: message.options.topic
+      },
+      &quot;content-encoding&quot;: &quot;aes128gcm&quot;,
+      &quot;content-length&quot;: body.byteLength.toString(),
+      &quot;content-type&quot;: &quot;application/octet-stream&quot;
+    },
+    method: &quot;post&quot;,
+    body
+  };
+}
+
+// worker.mjs
+var import_planner = __toESM(require_planner(), 1);
+var { dueReminders, notificationPayload } = import_planner.default;
+var DATABASE = &quot;https://tour-dasie-default-rtdb.europe-west1.firebasedatabase.app&quot;;
+var API_KEY = &quot;AIzaSyAHQvnPU9LUMW2R6AAf1RHr2FuAjAhYRLM&quot;;
+var TRIP = &quot;asie&quot;;
+var PATH = /^[A-Za-z0-9_-]+$/;
+var MAX_BYTES = 4 * 1024 * 1024;
+var MAX_SENDS = 4;
+var pendingRun = null;
+function prerequisites(env) {
+  const missing = [];
+  for (const key of [&quot;FIREBASE_EMAIL&quot;, &quot;FIREBASE_PASSWORD&quot;, &quot;VAPID_PUBLIC_KEY&quot;, &quot;VAPID_PRIVATE_KEY&quot;]) if (typeof env[key] !== &quot;string&quot; || !env[key]) missing.push(key);
+  if (!env.REMINDER_STORE?.get || !env.REMINDER_STORE?.put) missing.push(&quot;REMINDER_STORE&quot;);
+  return missing;
+}
+function jsonResponse(value, status = 200) {
+  return new Response(JSON.stringify(value), { status, headers: { &quot;Content-Type&quot;: &quot;application/json; charset=utf-8&quot;, &quot;Cache-Control&quot;: &quot;no-store&quot;, &quot;X-Content-Type-Options&quot;: &quot;nosniff&quot;, &quot;Referrer-Policy&quot;: &quot;no-referrer&quot;, &quot;Content-Security-Policy&quot;: &quot;default-src &#x27;none&#x27;; frame-ancestors &#x27;none&#x27;&quot; } });
+}
+async function publicStatus(request) {
+  if (request.method !== &quot;GET&quot; &amp;&amp; request.method !== &quot;HEAD&quot;) return jsonResponse({ message: &quot;M\xE9thode non autoris\xE9e&quot; }, 405);
+  const response = jsonResponse({ service: &quot;Tour d\u2019Asie \u2014 rappels&quot;, programme: &quot;install\xE9&quot;, message: &quot;Le programme est install\xE9. Les envois n\xE9cessitent la configuration priv\xE9e, un d\xE9clencheur et la validation de s\xE9curit\xE9. Cette page ne d\xE9clenche aucun envoi.&quot; });
+  return request.method === &quot;HEAD&quot; ? new Response(null, { status: response.status, headers: response.headers }) : response;
+}
+async function limitedJSON(response) {
+  if (!response.ok) throw Error(&quot;REMOTE_REQUEST_FAILED&quot;);
+  if (Number(response.headers.get(&quot;content-length&quot;)) &gt; MAX_BYTES) throw Error(&quot;DATA_TOO_LARGE&quot;);
+  const reader = response.body.getReader();
+  let size = 0;
+  const chunks = [];
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      size += value.length;
+      if (size &gt; MAX_BYTES) throw Error(&quot;DATA_TOO_LARGE&quot;);
+      chunks.push(value);
+    }
+  } finally {
+    await reader.cancel().catch(() =&gt; {
+    });
+  }
+  const bytes = new Uint8Array(size);
+  let at = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, at);
+    at += chunk.length;
+  }
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+async function timedFetch(fetcher, url, options = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() =&gt; controller.abort(), 15e3);
+  try {
+    return await fetcher(url, { ...options, redirect: &quot;error&quot;, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+async function firebaseSession(env, fetcher = fetch) {
+  const response = await timedFetch(fetcher, `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${API_KEY}`, { method: &quot;POST&quot;, headers: { &quot;Content-Type&quot;: &quot;application/json&quot; }, body: JSON.stringify({ email: env.FIREBASE_EMAIL, password: env.FIREBASE_PASSWORD, returnSecureToken: true }) });
+  const data = await limitedJSON(response);
+  if (typeof data.idToken !== &quot;string&quot; || !data.idToken) throw Error(&quot;AUTH_FAILED&quot;);
+  async function request(path, options = {}) {
+    if (!path.split(&quot;/&quot;).every((part) =&gt; PATH.test(part))) throw Error(&quot;INVALID_DATABASE_PATH&quot;);
+    const url = new URL(`${DATABASE}/${path}.json`);
+    url.searchParams.set(&quot;auth&quot;, data.idToken);
+    return timedFetch(fetcher, url.href, options);
+  }
+  return {
+    read: async (path) =&gt; limitedJSON(await request(path)),
+    write: async (path, value) =&gt; {
+      const response2 = await request(path, { method: &quot;PUT&quot;, headers: { &quot;Content-Type&quot;: &quot;application/json&quot; }, body: JSON.stringify(value) });
+      if (!response2.ok) throw Error(&quot;DATABASE_WRITE_DENIED&quot;);
+    },
+    claim: async (path, now) =&gt; {
+      const response2 = await request(path, { headers: { &quot;X-Firebase-ETag&quot;: &quot;true&quot; } });
+      const etag = response2.headers.get(&quot;etag&quot;), old = await limitedJSON(response2);
+      if (!etag) throw Error(&quot;MISSING_ETAG&quot;);
+      if (old?.sentAt || old?.cancelledAt || old?.leaseAt &amp;&amp; now - old.leaseAt &lt; 20 * 6e4) return false;
+      const put = await request(path, { method: &quot;PUT&quot;, headers: { &quot;Content-Type&quot;: &quot;application/json&quot;, &quot;If-Match&quot;: etag }, body: JSON.stringify({ leaseAt: now }) });
+      if (put.status === 412) return false;
+      if (!put.ok) throw Error(&quot;DATABASE_WRITE_DENIED&quot;);
+      return true;
+    }
+  };
+}
+function subscriptionAllowed(device, publicKey) {
+  if (!device || device.disabled || device.vapidPublicKey !== publicKey || ![&quot;marie&quot;, &quot;baptiste&quot;].includes(device.owner)) return false;
+  if (!Array.isArray(device.trips) || !device.trips.includes(TRIP)) return false;
+  try {
+    const u = new URL(device.endpoint);
+    if (u.protocol !== &quot;https:&quot; || u.username || u.password || u.port) return false;
+    if (![&quot;fcm.googleapis.com&quot;, &quot;updates.push.services.mozilla.com&quot;, &quot;web.push.apple.com&quot;].some((h) =&gt; u.hostname === h || u.hostname.endsWith(&quot;.&quot; + h))) return false;
+    return /^[A-Za-z0-9_-]{87}$/.test(device.keys?.p256dh || &quot;&quot;) &amp;&amp; /^[A-Za-z0-9_-]{22}$/.test(device.keys?.auth || &quot;&quot;);
+  } catch {
+    return false;
+  }
+}
+function compactContent(content) {
+  if (!content || !Array.isArray(content.STAGES) || !Array.isArray(content.REMINDERS)) throw Error(&quot;INVALID_CONTENT&quot;);
+  return { STAGES: content.STAGES.map((s) =&gt; ({ id: s.id, start: s.start, end: s.end })), REMINDERS: content.REMINDERS.filter((r) =&gt; PATH.test(r.id) &amp;&amp; /^\d{4}-\d{2}-\d{2}$/.test(r.date)).map((r) =&gt; ({ id: r.id, date: r.date, t: String(r.t || &quot;Rappel&quot;).slice(0, 100), s: String(r.s || &quot;&quot;).slice(0, 450), icon: String(r.icon || &quot;\u{1F514}&quot;).slice(0, 8), audience: r.audience, notificationHour: r.notificationHour })) };
+}
+async function contentCache(env, db, now) {
+  const key = `content-${TRIP}`, cached = await env.REMINDER_STORE.get(key, &quot;json&quot;);
+  if (cached?.at &amp;&amp; now - cached.at &lt; 36e5) return cached.value;
+  const raw = await db.read(`voyages/${TRIP}/content`);
+  const value = compactContent(typeof raw === &quot;string&quot; ? JSON.parse(raw) : raw);
+  await env.REMINDER_STORE.put(key, JSON.stringify({ at: now, value }), { expirationTtl: 7200 });
+  return value;
+}
+function stateValue(raw) {
+  const value = typeof raw === &quot;string&quot; ? JSON.parse(raw) : raw;
+  if (!value || typeof value !== &quot;object&quot; || !value.reminders || typeof value.reminders !== &quot;object&quot;) throw Error(&quot;INVALID_STATE&quot;);
+  return { reminders: value.reminders };
+}
+async function dispatch(env, now = /* @__PURE__ */ new Date(), deps = {}) {
+  if (env.NOTIFICATIONS_ENABLED !== &quot;true&quot; || env.SECURITY_REVIEW_APPROVED !== &quot;true&quot;) return { status: &quot;disabled&quot;, accepted: 0 };
+  if (prerequisites(env).length) return { status: &quot;configuration_incomplete&quot;, accepted: 0 };
+  const db = deps.db || await firebaseSession(env, deps.fetcher || fetch);
+  const settings = await db.read(`voyages/${TRIP}/notificationSettings`);
+  if (settings?.enabled !== true) return { status: &quot;disabled&quot;, accepted: 0 };
+  const content = await contentCache(env, db, now.getTime());
+  const devices = await db.read(&quot;push&quot;);
+  const candidates = Object.entries(devices || {}).filter(([key, d]) =&gt; PATH.test(key) &amp;&amp; subscriptionAllowed(d, env.VAPID_PUBLIC_KEY)).slice(0, 5);
+  if (!candidates.length) return { status: &quot;devices_not_registered&quot;, accepted: 0 };
+  let accepted = 0, failed = 0, state;
+  const send = deps.send || (async (device, payload) =&gt; {
+    const request = await buildPushPayload({ data: JSON.stringify(payload), options: { ttl: 21600, urgency: &quot;normal&quot; } }, device, { subject: &quot;https://tour-dasie.github.io/voyages/&quot;, publicKey: env.VAPID_PUBLIC_KEY, privateKey: env.VAPID_PRIVATE_KEY });
+    return timedFetch(deps.fetcher || fetch, device.endpoint, request);
+  });
+  for (const [key, device] of candidates) {
+    const logs = await db.read(`notificationDelivery/${TRIP}/${key}`) || {};
+    const due = dueReminders(content, { reminders: {} }, device, now).filter((r) =&gt; !logs[r.id]?.sentAt &amp;&amp; !logs[r.id]?.cancelledAt);
+    const testAt = device.testRequestedAt;
+    if (testAt &amp;&amp; testAt &gt; (device.testSentAt || 0) &amp;&amp; now.getTime() - testAt &lt; 36e5 &amp;&amp; Number.isSafeInteger(testAt)) due.unshift({ id: `test_${testAt}`, test: true, t: &quot;Test serveur \u2014 Tour d\u2019Asie&quot;, s: &quot;Cette notification vient du service Cloudflare. Elle peut arriver carnet ferm\xE9.&quot; });
+    for (const reminder of due) {
+      if (accepted + failed &gt;= MAX_SENDS) break;
+      if (!reminder.test) {
+        if (!state) state = stateValue(await db.read(`voyages/${TRIP}/data/blob`));
+        if (state.reminders[reminder.id]) continue;
+      }
+      const logPath = `notificationDelivery/${TRIP}/${key}/${reminder.id}`;
+      if (!await db.claim(logPath, now.getTime())) continue;
+      try {
+        const response = await send(device, notificationPayload(reminder, TRIP));
+        if (response.status === 201 || response.status === 202) {
+          await db.write(logPath, { sentAt: now.getTime(), leaseAt: 0 });
+          accepted++;
+        } else {
+          await db.write(logPath, { leaseAt: now.getTime(), lastStatus: response.status });
+          failed++;
+          if (response.status === 404 || response.status === 410) break;
+        }
+      } catch {
+        failed++;
+      }
+    }
+  }
+  await db.write(`voyages/${TRIP}/notificationService`, { status: &quot;active&quot;, lastRunAt: now.getTime(), accepted, failed, mode: &quot;individual&quot;, provider: &quot;cloudflare&quot;, cadenceMinutes: 15 });
+  return { status: &quot;ran&quot;, accepted, failed };
+}
+var worker_default = {
+  fetch: publicStatus,
+  async scheduled(event, env, ctx) {
+    if (pendingRun) return;
+    pendingRun = dispatch(env, new Date(event.scheduledTime)).catch(() =&gt; ({ status: &quot;failed&quot;, accepted: 0 }));
+    try {
+      await pendingRun;
+    } finally {
+      pendingRun = null;
+    }
+  }
+};
+export {
+  worker_default as default,
+  dispatch,
+  firebaseSession,
+  prerequisites,
+  publicStatus,
+  subscriptionAllowed
+};
+</textarea><script>document.getElementById('copy').onclick=async()=>{const el=document.getElementById('code');try{await navigator.clipboard.writeText(el.value);document.getElementById('status').textContent='Programme copié. Retourne dans Cloudflare pour le coller.';}catch{el.focus();el.select();el.setSelectionRange(0,el.value.length);const ok=document.execCommand('copy');document.getElementById('status').textContent=ok?'Programme copié.':'Le texte est sélectionné : appuie sur Copier.';}};</script></html>
