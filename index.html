@@ -641,7 +641,7 @@ function openSync(){
 /* ============ APPLI INSTALLABLE + NOTIFICATIONS PUSH ============ */
 const VAPID_PUBLIC="BJrHrykUoHRgXFQHcJz03DBSvokJG43YUoATcuppRHl4FRBZU8nNlhd-YR6RAj5ckn49YPs17xa81rFj7lLul9s";
 let swReg=null,deferredInstall=null;
-const OFFLINE_CACHE='voyages-v23';
+const OFFLINE_CACHE='voyages-v24';
 const OFFLINE_FILES=['./','index.html','manifest.json','vols.html','icon-192.png','icon-512.png','apple-touch-icon.png','security.js','search.js','vendor/dompurify-3.4.16.min.js','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js'];
 async function prepareOffline(){
   const btn=$('#offline-prepare'),status=$('#offline-status');
@@ -665,7 +665,7 @@ function isStandalone(){return window.matchMedia('(display-mode: standalone)').m
 function isiOS(){return /iphone|ipad|ipod/i.test(navigator.userAgent);}
 function pushSupported(){return('serviceWorker'in navigator)&&('PushManager'in window)&&('Notification'in window);}
 function initPWA(){
-  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js?v=20261011-search',{updateViaCache:'none'}).then(r=>{swReg=r;r.update().catch(()=>{});}).catch(()=>{});}
+  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js?v=20261011-joint-budget',{updateViaCache:'none'}).then(r=>{swReg=r;r.update().catch(()=>{});}).catch(()=>{});}
   window.addEventListener('beforeinstallprompt',ev=>{ev.preventDefault();deferredInstall=ev;});
   window.addEventListener('offline',()=>setSyncPill('off'));
   window.addEventListener('online',()=>{if(SYNC.user){bootTrips();if(syncActive())pushCloud(true);}fetchRates(true);});
@@ -680,7 +680,7 @@ async function enablePush(){
   if(isiOS()&&!isStandalone()){toast("iPhone : ajoute d'abord à l'écran d'accueil, puis rouvre depuis l'icône");return;}
   if(!pushSupported()){toast('Notifications non supportées sur ce navigateur');return;}
   try{
-    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js?v=20261011-search',{updateViaCache:'none'});
+    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js?v=20261011-joint-budget',{updateViaCache:'none'});
     await navigator.serviceWorker.ready;
     const perm=await Notification.requestPermission();
     if(perm!=='granted'){toast('Notifications refusées dans les réglages');return;}
@@ -958,15 +958,16 @@ function clearPhoto(sid){delete S.photos[sid];save();closeModal();renderItin();r
 /* ============ BUDGET ============ */
 /* ===== devises & partage (Tricount) ===== */
 const PAYERS=[{id:"marie",nm:"Marie",em:"👩"},{id:"baptiste",nm:"Baptiste",em:"👨"}];
+const EXPENSE_PAYERS=[...PAYERS,{id:"joint",nm:"Compte commun",em:"👫"}];
 function rateOf(cur){const r=(S.rates&&S.rates[cur]!=null)?S.rates[cur]:DEFAULT_RATES[cur];return (r!=null)?r:1;}
 function moneyCents(value){return Math.round((Number(value)+Number.EPSILON)*100);}
 function toEur(e){return moneyCents((parseFloat(e.amt)||0)*rateOf(e.cur||'EUR'))/100;}
 function fmtCur(amt,cur){cur=cur||'EUR';const c=CURRENCIES.find(x=>x.c===cur),sym=c?c.s:htmlText(cur),n=Number(amt).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2});return cur==='EUR'?(n+' €'):(n+' '+sym);}
-function payerName(id){const p=PAYERS.find(x=>x.id===id);return p?p.nm:'';}
+function payerName(id){const p=EXPENSE_PAYERS.find(x=>x.id===id);return p?p.nm:'';}
 function otherPayer(id){return id==='baptiste'?'marie':'baptiste';}
-function expenseBeneficiary(e){return PAYERS.some(p=>p.id===e.for)?e.for:'both';}
+function expenseBeneficiary(e){if(e.by==='joint')return 'both';return PAYERS.some(p=>p.id===e.for)?e.for:'both';}
 function expenseShare(e,id){const beneficiary=expenseBeneficiary(e),cents=moneyCents(toEur(e));return beneficiary==='both'?(id==='marie'?Math.ceil(cents/2):Math.floor(cents/2))/100:beneficiary===id?cents/100:0;}
-function expenseDebt(e){return ((e.by||'marie')==='marie'?toEur(e):0)-expenseShare(e,'marie');}
+function expenseDebt(e){if(e.by==='joint')return 0;return ((e.by||'marie')==='marie'?toEur(e):0)-expenseShare(e,'marie');}
 function expenseForLabel(e){const beneficiary=expenseBeneficiary(e);return beneficiary==='both'?'pour les deux':'pour '+payerName(beneficiary);}
 function meAsPayer(){const em=(SYNC.user&&SYNC.user.email)||'';return em.indexOf('baptiste')>=0?'baptiste':'marie';}
 function updateEurPreview(){const s=$('#e-cur'),a=$('#e-amt'),o=$('#e-eur');if(!s||!o)return;const cur=s.value,amt=parseFloat(a.value)||0;
@@ -1036,6 +1037,7 @@ function renderBudget(){
   html+=`<div style="text-align:center;margin:-4px 0 12px"><button class="chip" onclick="openRates()">💱 Taux de change</button></div>`;
   const byM=S.expenses.filter(e=>(e.by||'marie')==='marie').reduce((a,e)=>a+toEur(e),0);
   const byB=S.expenses.filter(e=>e.by==='baptiste').reduce((a,e)=>a+toEur(e),0);
+  const byJoint=S.expenses.filter(e=>e.by==='joint').reduce((a,e)=>a+toEur(e),0);
   const setl=S.settlements||[];
   const sumB2M=setl.filter(x=>x.from==='baptiste').reduce((a,x)=>a+toEur(x),0);
   const sumM2B=setl.filter(x=>x.from==='marie').reduce((a,x)=>a+toEur(x),0);
@@ -1046,12 +1048,13 @@ function renderBudget(){
     ?`<b>Baptiste</b> doit <b style="color:var(--acc-d)">${eur(owe)}</b> à <b>Marie</b>`
     :`<b>Marie</b> doit <b style="color:var(--acc-d)">${eur(-owe)}</b> à <b>Baptiste</b>`);
   html+=`<div class="sec-title">Qui a payé · remboursement</div><div class="card">
-    <div class="cat-line" style="border-top:none"><span class="fl">👩</span><span class="nm">Marie a payé</span><span class="amt"><span class="r">${eur(byM)}</span></span></div>
-    <div class="cat-line"><span class="fl">👨</span><span class="nm">Baptiste a payé</span><span class="amt"><span class="r">${eur(byB)}</span></span></div>
+    <div class="cat-line" style="border-top:none"><span class="fl">👩</span><span class="nm">Marie · compte personnel</span><span class="amt"><span class="r">${eur(byM)}</span></span></div>
+    <div class="cat-line"><span class="fl">👨</span><span class="nm">Baptiste · compte personnel</span><span class="amt"><span class="r">${eur(byB)}</span></span></div>
+    <div class="cat-line"><span class="fl">👫</span><span class="nm">Compte commun · payé à deux</span><span class="amt"><span class="r">${eur(byJoint)}</span></span></div>
     <div class="cat-line"><span class="fl">👩</span><span class="nm">Part des dépenses de Marie</span><span class="amt"><span class="r">${eur(shareM)}</span></span></div>
     <div class="cat-line"><span class="fl">👨</span><span class="nm">Part des dépenses de Baptiste</span><span class="amt"><span class="r">${eur(shareB)}</span></span></div>
     ${setl.slice().sort((a,b)=>b.id-a.id).map(x=>`<div class="cat-line"><span class="fl">🔁</span><span class="nm" style="font-weight:400;font-size:13px">${payerName(x.from)} → ${payerName(x.from==='marie'?'baptiste':'marie')} (remboursement)${x.label?'<br><span style="color:var(--muted);font-size:11px">'+x.label+'</span>':''}</span><span class="amt"><span class="r">${eur(toEur(x))}</span></span><button class="del" onclick="delSettle(${x.id})">✕</button></div>`).join('')}
-    <div class="info" style="margin:10px 0 0"><span style="font-size:16px">🤝</span> ${settle}<div style="font-size:11px;color:var(--muted);margin-top:3px">Pour les deux : moitié chacun (le centime restant va à Marie). Pour une personne : sa part entière. Remboursements déduits. Les anciennes dépenses restent partagées à moitié.</div></div>
+    <div class="info" style="margin:10px 0 0"><span style="font-size:16px">🤝</span> ${settle}<div style="font-size:11px;color:var(--muted);margin-top:3px">Pour les deux : moitié chacun (le centime restant va à Marie). Pour une personne : sa part entière. Compte commun : payé pour les deux, aucun remboursement entre vous. Remboursements déduits. Les anciennes dépenses restent partagées à moitié.</div></div>
     <button class="btn ghost" style="margin-top:10px" onclick="openSettle()">🔁 Enregistrer un remboursement</button>
   </div>`;
   html+=`<div class="sec-title">Par pays — réel vs prévu</div><div class="card">`;
@@ -1333,7 +1336,7 @@ function openExpense(){
     <select id="e-cur" onchange="updateEurPreview();updateExpenseFor()">${CURRENCIES.map(c=>`<option value="${c.c}" ${c.c===expSel.cur?'selected':''}>${c.s} ${c.c} — ${c.nm}</option>`).join('')}</select>
     <label class="fl-l">Montant total payé (dans la devise)</label><input id="e-amt" type="number" inputmode="decimal" placeholder="0" step="0.01" oninput="updateEurPreview();updateExpenseFor()">
     <div id="e-eur" style="font-size:12.5px;color:var(--sage-d);font-weight:700;margin:6px 2px 0"></div>
-    <label class="fl-l">Payé par</label><div class="chips" id="e-by">${PAYERS.map(p=>`<button class="chip ${p.id===expSel.by?'on':''}" data-c="${p.id}" onclick="pickBy('${p.id}')">${p.em} ${htmlText(p.nm)}</button>`).join('')}</div>
+    <label class="fl-l">Payé par</label><div class="chips" id="e-by">${EXPENSE_PAYERS.map(p=>`<button class="chip ${p.id===expSel.by?'on':''}" data-c="${p.id}" onclick="pickBy('${p.id}')">${p.em} ${htmlText(p.nm)}</button>`).join('')}</div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px"><label class="fl-l" style="margin:0">Diviser</label><span style="font-size:12px;color:var(--muted)">Également entre les personnes cochées</span></div>
     <div class="card" id="e-for" style="margin-top:8px">${expenseForRows()}</div>
     <div id="e-share" style="font-size:12px;color:var(--muted);margin-top:6px">Le montant est partagé à moitié entre Marie et Baptiste.</div>
@@ -1369,13 +1372,13 @@ function currentCountry(){const t=today();for(const st of STAGES){if(t>=pd(st.st
 function pickCat(id){expSel.cat=id;document.querySelectorAll('#e-cats .chip').forEach(c=>c.classList.toggle('on',c.dataset.c===id));}
 function pickCty(id){expSel.country=id;document.querySelectorAll('#e-cty .chip').forEach(c=>c.classList.toggle('on',c.dataset.c===id));
   const sel=$('#e-cur');if(sel&&COUNTRY_CUR[id]){sel.value=COUNTRY_CUR[id];updateEurPreview();}}
-function expenseForRows(){const amt=Math.max(0,parseFloat($('#e-amt')?.value)||0),cur=$('#e-cur')?.value||expSel.cur||'EUR';return PAYERS.map(p=>{const checked=expSel.for==='both'||expSel.for===p.id;const cents=moneyCents(amt),share=checked?(expSel.for==='both'?(p.id==='marie'?Math.ceil(cents/2):Math.floor(cents/2)):cents)/100:0;return `<label style="display:flex;align-items:center;gap:12px;padding:14px 12px;border-bottom:1px solid var(--line);cursor:pointer"><input type="checkbox" style="width:20px;height:20px;margin:0;accent-color:var(--acc)" ${checked?'checked':''} onchange="toggleExpenseFor('${p.id}')"><span style="flex:1">${htmlText(p.nm)}${p.id===meAsPayer()?' (moi)':''}</span><strong>${share.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})} ${cur==='EUR'?'€':cur}</strong></label>`;}).join('');}
-function updateExpenseFor(){const rows=$('#e-for'),info=$('#e-share');if(rows)rows.innerHTML=expenseForRows();if(info)info.textContent=expSel.for==='both'?'Le montant est partagé à moitié entre Marie et Baptiste.':expSel.for===expSel.by?'Dépense personnelle : aucun remboursement à l’autre personne.':payerName(expSel.for)+' doit rembourser la totalité à '+payerName(expSel.by)+'.';}
-function toggleExpenseFor(id){if(!PAYERS.some(p=>p.id===id))return;if(expSel.for==='both')expSel.for=otherPayer(id);else if(expSel.for===id){toast('Garde au moins une personne cochée');}else expSel.for='both';updateExpenseFor();}
-function pickBy(id){expSel.by=id;document.querySelectorAll('#e-by .chip').forEach(c=>c.classList.toggle('on',c.dataset.c===id));updateExpenseFor();}
+function expenseForRows(){const amt=Math.max(0,parseFloat($('#e-amt')?.value)||0),cur=$('#e-cur')?.value||expSel.cur||'EUR';return PAYERS.map(p=>{const checked=expSel.for==='both'||expSel.for===p.id;const cents=moneyCents(amt),share=checked?(expSel.for==='both'?(p.id==='marie'?Math.ceil(cents/2):Math.floor(cents/2)):cents)/100:0;return `<label style="display:flex;align-items:center;gap:12px;padding:14px 12px;border-bottom:1px solid var(--line);cursor:pointer"><input type="checkbox" style="width:20px;height:20px;margin:0;accent-color:var(--acc)" ${checked?'checked':''} ${expSel.by==='joint'?'disabled':''} onchange="toggleExpenseFor('${p.id}')"><span style="flex:1">${htmlText(p.nm)}${p.id===meAsPayer()?' (moi)':''}</span><strong>${share.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})} ${cur==='EUR'?'€':cur}</strong></label>`;}).join('');}
+function updateExpenseFor(){const rows=$('#e-for'),info=$('#e-share');if(rows)rows.innerHTML=expenseForRows();if(info)info.textContent=expSel.by==='joint'?'Payé par vous deux avec le compte commun, pour vous deux. Aucun remboursement entre vous.':expSel.for==='both'?'Le montant est partagé à moitié entre Marie et Baptiste.':expSel.for===expSel.by?'Dépense personnelle : aucun remboursement à l’autre personne.':payerName(expSel.for)+' doit rembourser la totalité à '+payerName(expSel.by)+'.';}
+function toggleExpenseFor(id){if(expSel.by==='joint')return;if(!PAYERS.some(p=>p.id===id))return;if(expSel.for==='both')expSel.for=otherPayer(id);else if(expSel.for===id){toast('Garde au moins une personne cochée');}else expSel.for='both';updateExpenseFor();}
+function pickBy(id){if(!EXPENSE_PAYERS.some(p=>p.id===id))return;expSel.by=id;if(id==='joint')expSel.for='both';document.querySelectorAll('#e-by .chip').forEach(c=>c.classList.toggle('on',c.dataset.c===id));updateExpenseFor();}
 function addExpense(){const amt=parseFloat($('#e-amt').value);if(!amt||amt<=0){toast('Entre un montant valide');return;}
   const cur=$('#e-cur')?$('#e-cur').value:'EUR';
-  S.expenses.push({id:Date.now(),amt,cur,by:expSel.by,for:PAYERS.some(p=>p.id===expSel.for)?expSel.for:'both',cat:expSel.cat,country:expSel.country,label:$('#e-label').value.trim(),date:$('#e-date').value,receipt:expSel.receipt||null});
+  S.expenses.push({id:Date.now(),amt,cur,by:expSel.by,for:expSel.by==='joint'?'both':PAYERS.some(p=>p.id===expSel.for)?expSel.for:'both',cat:expSel.cat,country:expSel.country,label:$('#e-label').value.trim(),date:$('#e-date').value,receipt:expSel.receipt||null});
   save();closeModal();renderBudget();renderToday();toast('✓ Dépense ajoutée');}
 function closeModal(){searchResults=[];searchDocuments=[];$('#modal').innerHTML='';}
 
