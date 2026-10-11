@@ -2,12 +2,12 @@
    1) Notifications push (appli fermée)
    2) Mode hors-ligne : met en cache l'appli + ses ressources pour consulter sans réseau */
 importScripts('security.js');
-const CACHE = 'voyages-v22';
+const CACHE = 'voyages-v23';
 
 /* Ressources internes (même domaine) */
 const CORE = [
   './', 'index.html', 'manifest.json', 'vols.html',
-  'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'security.js', 'vendor/dompurify-3.4.16.min.js'
+  'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'security.js', 'search.js', 'vendor/dompurify-3.4.16.min.js'
 ];
 /* Librairies externes (carte + Firebase) — mises en cache pour marcher hors-ligne */
 const CDN = [

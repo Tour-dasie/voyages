@@ -327,6 +327,7 @@ body.locked header,body.locked main,body.locked .nav,body.locked #fab{display:no
 .tripitem .tn{font-weight:750;color:var(--ink)}
 .tripitem .td2{font-size:12px;color:var(--muted);margin-top:1px}
 .tripitem .tok{color:var(--acc-d);font-weight:800;font-size:16px}
+.search-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.search-heading h3{margin:0}.search-sheet label{display:block;margin:16px 0 7px;font-size:14px}.search-sheet input{width:100%;font-size:16px}.search-context,#search-status{font-size:13px;color:var(--ink2)}.search-result h4{margin:8px 0;font-size:17px}.search-body{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.65;margin-bottom:14px}.search-sheet{max-width:760px}.search-result .btn{width:100%}@media(max-width:420px){.hrow{flex-wrap:wrap;gap:8px}.hbtns{gap:4px}.htitle{font-size:14px;gap:5px}.iconbtn{width:33px;height:35px}.brandmark{width:25px;height:25px}}
 </style>
 </head>
 <body class="locked">
@@ -335,6 +336,7 @@ body.locked header,body.locked main,body.locked .nav,body.locked #fab{display:no
   <div class="wrap hrow">
     <div class="htitle"><img class="brandmark" src="icon-192.png" alt=""> <span id="tripname">Mes voyages</span></div>
     <div class="hbtns">
+      <button class="iconbtn" onclick="openSearch()" title="Rechercher dans le carnet" aria-label="Rechercher dans le carnet">🔎</button>
       <button class="iconbtn" onclick="openTrips()" title="Changer de voyage">🧳</button>
       <button class="iconbtn" id="syncbtn" onclick="openSync()" title="Synchronisation">☁️<span id="syncdot" class="syncdot off"></span></button>
       <button class="iconbtn" onclick="openData()" title="Sauvegarde">💾</button>
@@ -376,6 +378,7 @@ body.locked header,body.locked main,body.locked .nav,body.locked #fab{display:no
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="vendor/dompurify-3.4.16.min.js"></script>
 <script src="security.js"></script>
+<script src="search.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
@@ -485,7 +488,7 @@ function applyContent(str){
     return true;
   }catch(e){return false;}
 }
-function clearContent(){HANDBOOK={};STAGES=[];SOCIAL={};PRATIQUE={};PACK=[];RESTO_CO={};SPOT_CO={};REMINDERS=[];CHECK=[];BUDGET_PREVU=[];GALLERY=[];COUNTRY_CUR={};CFLAG={};}
+function clearContent(){searchResults=[];searchDocuments=[];HANDBOOK={};STAGES=[];SOCIAL={};PRATIQUE={};PACK=[];RESTO_CO={};SPOT_CO={};REMINDERS=[];CHECK=[];BUDGET_PREVU=[];GALLERY=[];COUNTRY_CUR={};CFLAG={};}
 function fmtD(s){try{return new Date(s+'T00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'});}catch(e){return s;}}
 function tripDates(){return (TRIP_START&&TRIP_END)?('Du '+fmtD(TRIP_START)+' au '+fmtD(TRIP_END)):'';}
 function setTripName(){var m=TRIPS[TRIP]||{};var el=document.getElementById('tripname');if(el)el.textContent=m.name||'Voyage';}
@@ -638,8 +641,8 @@ function openSync(){
 /* ============ APPLI INSTALLABLE + NOTIFICATIONS PUSH ============ */
 const VAPID_PUBLIC="BJrHrykUoHRgXFQHcJz03DBSvokJG43YUoATcuppRHl4FRBZU8nNlhd-YR6RAj5ckn49YPs17xa81rFj7lLul9s";
 let swReg=null,deferredInstall=null;
-const OFFLINE_CACHE='voyages-v22';
-const OFFLINE_FILES=['./','index.html','manifest.json','vols.html','icon-192.png','icon-512.png','apple-touch-icon.png','security.js','vendor/dompurify-3.4.16.min.js','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js'];
+const OFFLINE_CACHE='voyages-v23';
+const OFFLINE_FILES=['./','index.html','manifest.json','vols.html','icon-192.png','icon-512.png','apple-touch-icon.png','security.js','search.js','vendor/dompurify-3.4.16.min.js','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js'];
 async function prepareOffline(){
   const btn=$('#offline-prepare'),status=$('#offline-status');
   if(!navigator.onLine){toast('Connecte-toi pour télécharger le carnet.');return;}
@@ -662,7 +665,7 @@ function isStandalone(){return window.matchMedia('(display-mode: standalone)').m
 function isiOS(){return /iphone|ipad|ipod/i.test(navigator.userAgent);}
 function pushSupported(){return('serviceWorker'in navigator)&&('PushManager'in window)&&('Notification'in window);}
 function initPWA(){
-  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js?v=20261011-budget-cents',{updateViaCache:'none'}).then(r=>{swReg=r;r.update().catch(()=>{});}).catch(()=>{});}
+  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js?v=20261011-search',{updateViaCache:'none'}).then(r=>{swReg=r;r.update().catch(()=>{});}).catch(()=>{});}
   window.addEventListener('beforeinstallprompt',ev=>{ev.preventDefault();deferredInstall=ev;});
   window.addEventListener('offline',()=>setSyncPill('off'));
   window.addEventListener('online',()=>{if(SYNC.user){bootTrips();if(syncActive())pushCloud(true);}fetchRates(true);});
@@ -677,7 +680,7 @@ async function enablePush(){
   if(isiOS()&&!isStandalone()){toast("iPhone : ajoute d'abord à l'écran d'accueil, puis rouvre depuis l'icône");return;}
   if(!pushSupported()){toast('Notifications non supportées sur ce navigateur');return;}
   try{
-    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js?v=20261011-budget-cents',{updateViaCache:'none'});
+    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js?v=20261011-search',{updateViaCache:'none'});
     await navigator.serviceWorker.ready;
     const perm=await Notification.requestPermission();
     if(perm!=='granted'){toast('Notifications refusées dans les réglages');return;}
@@ -1374,7 +1377,7 @@ function addExpense(){const amt=parseFloat($('#e-amt').value);if(!amt||amt<=0){t
   const cur=$('#e-cur')?$('#e-cur').value:'EUR';
   S.expenses.push({id:Date.now(),amt,cur,by:expSel.by,for:PAYERS.some(p=>p.id===expSel.for)?expSel.for:'both',cat:expSel.cat,country:expSel.country,label:$('#e-label').value.trim(),date:$('#e-date').value,receipt:expSel.receipt||null});
   save();closeModal();renderBudget();renderToday();toast('✓ Dépense ajoutée');}
-function closeModal(){$('#modal').innerHTML='';}
+function closeModal(){searchResults=[];searchDocuments=[];$('#modal').innerHTML='';}
 
 /* ============ DONNÉES ============ */
 function openData(){
@@ -1415,7 +1418,7 @@ function renderGuide(){
 }
 let reminderLinkOpened=false;
 function openReminderLink(){const params=new URLSearchParams(location.search),id=params.get('reminder');if(reminderLinkOpened||!id||!REMINDERS.some(r=>r.id===id))return;if(params.get('trip')&&params.get('trip')!==TRIP)return;reminderLinkOpened=true;remTab='ech';remPeriod='all';remCategory='all';remStage='all';renderRem();nav('rem');setTimeout(()=>document.getElementById('rem-'+cssId(id))?.scrollIntoView({block:'center'}),150);}
-function renderAll(){renderToday();renderItin();renderBudget();renderRem();renderGuide();setTimeout(openReminderLink,100);}
+function renderAll(){if(document.getElementById('trip-search')){searchDocuments=buildSearchDocuments();renderSearchResults();}renderToday();renderItin();renderBudget();renderRem();renderGuide();setTimeout(openReminderLink,100);}
 /* le carnet reste verrouillé (body.locked) et vide tant que la connexion n'est pas validée ;
    renderAll()+nav() sont déclenchés par initFirebase() une fois l'utilisateur authentifié */
 initPWA();initFirebase();fetchRates();
