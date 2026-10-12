@@ -17,7 +17,7 @@ function buildSearchDocuments(){
  add('Infos pratiques '+st.nm,'Infos pratiques',PRATIQUE[st.id],{view:'guide'},context);
  (st.blocks||[]).forEach(b=>{const ctx=st.nm+' · '+b.c+' · '+(b.dd||'');const target={view:'itin',stage:st.id,block:st.id+'-'+b.c};
  add(b.c,'Destination',{sum:b.sum,practical:b.practical,social:SOCIAL[b.c]||b.social},target,ctx);
- (b.days||[]).forEach(day=>add(day.dt+' · '+searchText(day.t),'Journée',day,target,ctx));
+ scheduledDays(st,b).forEach(day=>add(day.dt+' · '+searchText(day.t),'Journée',day,target,ctx));
  (b.spots||[]).forEach(sp=>add(typeof sp==='string'?sp:sp.n,'Lieu',sp,target,ctx));
  (b.resto||[]).forEach(sp=>add(typeof sp==='string'?sp:sp.n,'Restaurant',sp,target,ctx));
  });});

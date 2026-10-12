@@ -328,6 +328,7 @@ body.locked header,body.locked main,body.locked .nav,body.locked #fab{display:no
 .tripitem .td2{font-size:12px;color:var(--muted);margin-top:1px}
 .tripitem .tok{color:var(--acc-d);font-weight:800;font-size:16px}
 .search-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.search-heading h3{margin:0}.search-sheet label{display:block;margin:16px 0 7px;font-size:14px}.search-sheet input{width:100%;font-size:16px}.search-context,#search-status{font-size:13px;color:var(--ink2)}.search-result h4{margin:8px 0;font-size:17px}.search-body{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.65;margin-bottom:14px}.search-sheet{max-width:760px}.search-result .btn{width:100%}@media(max-width:420px){.hrow{flex-wrap:wrap;gap:8px}.hbtns{gap:4px}.htitle{font-size:14px;gap:5px}.iconbtn{width:33px;height:35px}.brandmark{width:25px;height:25px}}
+.day-actions{display:flex;gap:8px;margin:10px 0}.day-actions button{font:inherit;font-size:12px;border:1px solid var(--line);border-radius:8px;background:var(--card2);color:var(--ink2);padding:9px 12px}.day-grip{touch-action:none;cursor:grab}.day.drop-target{outline:2px solid var(--acc);background:var(--acc-soft)}.day.drag-source{opacity:.5}
 </style>
 </head>
 <body class="locked">
@@ -451,7 +452,7 @@ function pushCloud(now){
 }
 function applyRemoteData(d){
   S={days:d.days||{},blocks:d.blocks||{},check:d.check||{},expenses:d.expenses||[],
-     reminders:d.reminders||{},flights:d.flights||[],photos:d.photos||{},rates:d.rates||{},wishlist:d.wishlist||{},settlements:d.settlements||[],
+     reminders:d.reminders||{},flights:d.flights||[],photos:d.photos||{},rates:d.rates||{},wishlist:d.wishlist||{},settlements:d.settlements||[],dayOrders:d.dayOrders||{},
      _updatedAt:d._updatedAt||Date.now(),_seed1:d._seed1||S._seed1};
 }
 /* fusion sans perte au 1er raccordement : on garde tout ce qui est coché des deux côtés */
@@ -459,6 +460,8 @@ function mergeStates(a,b){
   const m={days:{},blocks:{},check:{},reminders:{},photos:{},expenses:[],flights:[],rates:{},wishlist:{},settlements:[]};
   ['days','blocks','check','reminders'].forEach(k=>{m[k]=Object.assign({},a[k]||{});const bb=b[k]||{};
     for(const key in bb){if(bb[key])m[k][key]=true;else if(!(key in m[k]))m[k][key]=bb[key];}});
+  m.dayOrders=Object.assign({},a.dayOrders||{});
+  for(const [key,value] of Object.entries(b.dayOrders||{})){if(!m.dayOrders[key]||(value.updatedAt||0)>=(m.dayOrders[key].updatedAt||0))m.dayOrders[key]=value;}
   m.photos=Object.assign({},a.photos||{},b.photos||{});
   const byId=arr=>{const o={};(arr||[]).forEach(x=>{o[x.id]=x;});return o;};
   m.expenses=Object.values(Object.assign(byId(a.expenses),byId(b.expenses)));
@@ -641,7 +644,7 @@ function openSync(){
 /* ============ APPLI INSTALLABLE + NOTIFICATIONS PUSH ============ */
 const VAPID_PUBLIC="BJrHrykUoHRgXFQHcJz03DBSvokJG43YUoATcuppRHl4FRBZU8nNlhd-YR6RAj5ckn49YPs17xa81rFj7lLul9s";
 let swReg=null,deferredInstall=null;
-const OFFLINE_CACHE='voyages-v24';
+const OFFLINE_CACHE='voyages-v25';
 const OFFLINE_FILES=['./','index.html','manifest.json','vols.html','icon-192.png','icon-512.png','apple-touch-icon.png','security.js','search.js','vendor/dompurify-3.4.16.min.js','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js'];
 async function prepareOffline(){
   const btn=$('#offline-prepare'),status=$('#offline-status');
@@ -665,7 +668,7 @@ function isStandalone(){return window.matchMedia('(display-mode: standalone)').m
 function isiOS(){return /iphone|ipad|ipod/i.test(navigator.userAgent);}
 function pushSupported(){return('serviceWorker'in navigator)&&('PushManager'in window)&&('Notification'in window);}
 function initPWA(){
-  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js?v=20261011-joint-budget',{updateViaCache:'none'}).then(r=>{swReg=r;r.update().catch(()=>{});}).catch(()=>{});}
+  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js?v=20261012-day-moves',{updateViaCache:'none'}).then(r=>{swReg=r;r.update().catch(()=>{});}).catch(()=>{});}
   window.addEventListener('beforeinstallprompt',ev=>{ev.preventDefault();deferredInstall=ev;});
   window.addEventListener('offline',()=>setSyncPill('off'));
   window.addEventListener('online',()=>{if(SYNC.user){bootTrips();if(syncActive())pushCloud(true);}fetchRates(true);});
@@ -680,7 +683,7 @@ async function enablePush(){
   if(isiOS()&&!isStandalone()){toast("iPhone : ajoute d'abord à l'écran d'accueil, puis rouvre depuis l'icône");return;}
   if(!pushSupported()){toast('Notifications non supportées sur ce navigateur');return;}
   try{
-    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js?v=20261011-joint-budget',{updateViaCache:'none'});
+    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js?v=20261012-day-moves',{updateViaCache:'none'});
     await navigator.serviceWorker.ready;
     const perm=await Notification.requestPermission();
     if(perm!=='granted'){toast('Notifications refusées dans les réglages');return;}
@@ -923,9 +926,9 @@ function blockHtml(st,b){
         <div class="cb ${all?'on':''}" onclick="toggleBlockDays('${st.id}','${esc(b.c)}',event)"></div>
         <div class="bt" onclick="toggleDays('${cssId(bid)}')"><div class="c">${htmlText(b.c)}</div><div class="dd">${htmlText(b.dd)}</div></div>
         ${mapl}<div class="exp" onclick="toggleDays('${cssId(bid)}')">▾</div></div>
-      ${destinationGuideHtml(b)}<div class="days">${b.days.map(d=>{const done=S.days[st.id+'-'+d.n];return`
-        <div class="day ${done?'done':''}"><div class="cb ${done?'on':''}" onclick="toggleDay('${st.id}',${d.n})"></div>
-          <span class="num">J${d.n}</span><div class="dtx"><span class="dc">${htmlText(d.dt)}</span> — ${richHTML(d.t)}${dayGuideHtml(d)}${fichesHtml(st,b,d.sp)}</div></div>`;}).join('')}</div>${restoHtml(st,b)}${socialHtml(st,b)}</div>`;
+      ${destinationGuideHtml(b)}<div class="days">${scheduledDays(st,b).map(d=>{const done=S.days[st.id+'-'+d._programN];return`
+        <div data-day-stage="${htmlText(st.id)}" data-day-block="${htmlText(b.c)}" data-day-n="${d.n}" class="day ${done?'done':''}"><div class="cb ${done?'on':''}" onclick="toggleDay('${st.id}',${d._programN})"></div>
+          <span class="num">J${d.n}</span><div class="dtx"><span class="dc">${htmlText(d.dt)}</span> — ${richHTML(d.t)}${dayGuideHtml(d)}${fichesHtml(st,b,d.sp)}<div class="day-actions"><button type="button" class="day-grip" aria-label="Glisser cette journée" onpointerdown="startDayDrag(event,this)">⠿ Glisser</button><button type="button" onclick="openDayMove('${st.id}',${d.n})">Déplacer</button></div></div></div>`;}).join('')}</div>${restoHtml(st,b)}${socialHtml(st,b)}</div>`;
   }
   const done=S.blocks[bid];
   return `<div class="block"><div class="block-h ${done?'done':''}">
@@ -933,6 +936,37 @@ function blockHtml(st,b){
     <div class="bt"><div class="c">${htmlText(b.c)} <span style="color:var(--muted);font-weight:400;font-size:12px">· ${htmlText(b.dd)}</span></div>
     <div class="dd" style="margin-top:3px">${richHTML(b.sum)}</div></div>${mapl}</div>${destinationGuideHtml(b)}${spotsHtml(st,b)}${restoHtml(st,b)}${socialHtml(st,b)}</div>`;
 }
+function scheduledDays(st,b){
+ const days=b.days||[],saved=(S.dayOrders||{})[st.id+'-'+b.c];
+ const order=saved&&saved.order;
+ const valid=Array.isArray(order)&&order.length===days.length&&new Set(order).size===days.length&&order.every(n=>days.some(d=>d.n===n));
+ return days.map((slot,i)=>{const program=valid?days.find(d=>d.n===order[i]):slot;return {...program,n:slot.n,dt:slot.dt,_programN:program.n};});
+}
+function moveDayProgram(sid,from,to){
+ const st=STAGES.find(s=>s.id===sid),b=st?.blocks.find(b=>b.days?.some(d=>d.n===from));
+ if(!b||from===to||!b.days.some(d=>d.n===to))return;
+ const order=scheduledDays(st,b).map(d=>d._programN),i=b.days.findIndex(d=>d.n===from),j=b.days.findIndex(d=>d.n===to);
+ order.splice(j,0,order.splice(i,1)[0]);S.dayOrders=S.dayOrders||{};S.dayOrders[sid+'-'+b.c]={order,updatedAt:Date.now()};
+ const open=[...document.querySelectorAll('.stage.open,.block.open')].map(el=>el.id);
+ save();closeModal();renderAll();open.forEach(id=>document.getElementById(id)?.classList.add('open'));
+ document.getElementById('stg-'+sid)?.classList.add('open');document.getElementById('blk-'+cssId(sid+'-'+b.c))?.classList.add('open');
+ toast('✓ Programme déplacé au '+b.days[j].dt);
+}
+function openDayMove(sid,n){
+ const st=STAGES.find(s=>s.id===sid),b=st?.blocks.find(b=>b.days?.some(d=>d.n===n));if(!b)return;
+ $('#modal').innerHTML='<div class="overlay"><div class="sheet"><div class="grabber"></div><h3>Déplacer le programme</h3><p>Les journées intermédiaires se décaleront. Vérifie les réservations et les rappels : leurs dates ne changent pas automatiquement.</p><label class="fl-l" for="move-date">Jour de destination</label><select id="move-date"></select><button class="btn" id="move-confirm">Déplacer</button><button class="btn ghost" onclick="closeModal()">Annuler</button></div></div>';
+ const select=$('#move-date');scheduledDays(st,b).filter(d=>d.n!==n).forEach(d=>{const o=document.createElement('option');o.value=d.n;o.textContent=d.dt+' — '+searchText(d.t);select.append(o);});
+ $('#move-confirm').disabled=!select.options.length;$('#move-confirm').onclick=()=>moveDayProgram(sid,n,Number(select.value));
+}
+function startDayDrag(ev,handle){
+ if(ev.button!==0)return;ev.preventDefault();const source=handle.closest('[data-day-n]');let target=null,moved=false;
+ handle.setPointerCapture(ev.pointerId);source.classList.add('drag-source');
+ const clear=()=>{source.classList.remove('drag-source');target?.classList.remove('drop-target');handle.removeEventListener('pointermove',move);handle.removeEventListener('pointerup',up);handle.removeEventListener('pointercancel',cancel);};
+ const move=e=>{moved=true;target?.classList.remove('drop-target');const row=document.elementFromPoint(e.clientX,e.clientY)?.closest('[data-day-n]');target=row&&row.dataset.dayStage===source.dataset.dayStage&&row.dataset.dayBlock===source.dataset.dayBlock?row:null;if(target!==source)target?.classList.add('drop-target');if(e.clientY<90)window.scrollBy(0,-25);else if(e.clientY>innerHeight-90)window.scrollBy(0,25);};
+ const up=()=>{const dest=target;clear();if(moved&&dest&&dest!==source)moveDayProgram(source.dataset.dayStage,Number(source.dataset.dayN),Number(dest.dataset.dayN));else if(!moved)openDayMove(source.dataset.dayStage,Number(source.dataset.dayN));};
+ const cancel=()=>clear();handle.addEventListener('pointermove',move);handle.addEventListener('pointerup',up);handle.addEventListener('pointercancel',cancel);
+}
+
 function toggleStage(id){$('#stg-'+id).classList.toggle('open');}
 function toggleDays(cid){$('#blk-'+cid).classList.toggle('open');}
 function toggleDay(sid,n){S.days[sid+'-'+n]=!S.days[sid+'-'+n];save();renderItin();$('#stg-'+sid).classList.add('open');}

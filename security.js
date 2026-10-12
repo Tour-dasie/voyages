@@ -37,7 +37,7 @@
     function visit(v){if(v&&typeof v==='object')for(const [key,item]of Object.entries(v)){if(['__proto__','constructor','prototype'].includes(key))throw Error('Invalid property');visit(item);}}
     visit(value);
     for(const key of ['expenses','flights','settlements'])if(value[key]!==undefined&&(!Array.isArray(value[key])||value[key].some(x=>!x||numericId(x.id)==='null')))throw Error('Invalid records');
-    for(const key of ['days','blocks','check','reminders','photos','rates','wishlist'])if(value[key]!==undefined&&(!value[key]||typeof value[key]!=='object'||Array.isArray(value[key])))throw Error('Invalid state');
+    for(const key of ['days','blocks','check','reminders','photos','rates','wishlist','dayOrders'])if(value[key]!==undefined&&(!value[key]||typeof value[key]!=='object'||Array.isArray(value[key])))throw Error('Invalid state');
     return value;
   }
   const api={htmlText,inlineString,imageURL,notificationURL,numericId,validKey,linkURL,richHTML,validateContent,validateState};
