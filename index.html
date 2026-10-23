@@ -464,7 +464,9 @@ function mergeStates(a,b){
   for(const [key,value] of Object.entries(b.dayOrders||{})){if(!m.dayOrders[key]||(value.updatedAt||0)>=(m.dayOrders[key].updatedAt||0))m.dayOrders[key]=value;}
   m.photos=Object.assign({},a.photos||{},b.photos||{});
   const byId=arr=>{const o={};(arr||[]).forEach(x=>{o[x.id]=x;});return o;};
-  m.expenses=Object.values(Object.assign(byId(a.expenses),byId(b.expenses)));
+  const expenses=byId(a.expenses);
+  for(const e of b.expenses||[]){const local=expenses[e.id];if(!local||(e.updatedAt||0)>=(local.updatedAt||0))expenses[e.id]=e;}
+  m.expenses=Object.values(expenses);
   m.flights=Object.values(Object.assign(byId(a.flights),byId(b.flights)));
   m.settlements=Object.values(Object.assign(byId(a.settlements),byId(b.settlements)));
   m.rates=Object.assign({},a.rates||{},b.rates||{});
@@ -644,7 +646,7 @@ function openSync(){
 /* ============ APPLI INSTALLABLE + NOTIFICATIONS PUSH ============ */
 const VAPID_PUBLIC="BJrHrykUoHRgXFQHcJz03DBSvokJG43YUoATcuppRHl4FRBZU8nNlhd-YR6RAj5ckn49YPs17xa81rFj7lLul9s";
 let swReg=null,deferredInstall=null;
-const OFFLINE_CACHE='voyages-v26';
+const OFFLINE_CACHE='voyages-v27';
 const OFFLINE_FILES=['./','index.html','manifest.json','vols.html','icon-192.png','icon-512.png','apple-touch-icon.png','security.js','search.js','vendor/dompurify-3.4.16.min.js','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js'];
 async function prepareOffline(){
   const btn=$('#offline-prepare'),status=$('#offline-status');
@@ -668,7 +670,7 @@ function isStandalone(){return window.matchMedia('(display-mode: standalone)').m
 function isiOS(){return /iphone|ipad|ipod/i.test(navigator.userAgent);}
 function pushSupported(){return('serviceWorker'in navigator)&&('PushManager'in window)&&('Notification'in window);}
 function initPWA(){
-  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js?v=20261023-joint-beneficiary',{updateViaCache:'none'}).then(r=>{swReg=r;r.update().catch(()=>{});}).catch(()=>{});}
+  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js?v=20261023-edit-expense',{updateViaCache:'none'}).then(r=>{swReg=r;r.update().catch(()=>{});}).catch(()=>{});}
   window.addEventListener('beforeinstallprompt',ev=>{ev.preventDefault();deferredInstall=ev;});
   window.addEventListener('offline',()=>setSyncPill('off'));
   window.addEventListener('online',()=>{if(SYNC.user){bootTrips();if(syncActive())pushCloud(true);}fetchRates(true);});
@@ -683,7 +685,7 @@ async function enablePush(){
   if(isiOS()&&!isStandalone()){toast("iPhone : ajoute d'abord à l'écran d'accueil, puis rouvre depuis l'icône");return;}
   if(!pushSupported()){toast('Notifications non supportées sur ce navigateur');return;}
   try{
-    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js?v=20261023-joint-beneficiary',{updateViaCache:'none'});
+    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js?v=20261023-edit-expense',{updateViaCache:'none'});
     await navigator.serviceWorker.ready;
     const perm=await Notification.requestPermission();
     if(perm!=='granted'){toast('Notifications refusées dans les réglages');return;}
@@ -1044,6 +1046,7 @@ function budgetExpenseRows(expenses){
       <div class="s">${htmlText(e.date||'Date non renseignée')} · ${htmlText(c.nm)}<br>Payé par ${payerName(e.by||'marie')} · ${expenseForLabel(e)}<br>Parts : Marie ${budgetMoney(expenseShare(e,'marie'))} · Baptiste ${budgetMoney(expenseShare(e,'baptiste'))}</div></div>
       <span class="ea" style="text-align:right">${amount} ${htmlText(cur==='EUR'?'€':cur)}${cur!=='EUR'?`<div style="font-size:11px;color:var(--muted)">≈ ${budgetMoney(toEur(e))}</div>`:''}</span>
       ${e.receipt?`<button class="del" onclick="viewReceipt(${TravelSecurity.numericId(e.id)})" aria-label="Voir le reçu">🧾</button>`:''}
+      <button class="del" onclick="openExpense(${TravelSecurity.numericId(e.id)})" aria-label="Modifier la dépense" title="Modifier la dépense">✏️</button>
       <button class="del" onclick="delExpense(${TravelSecurity.numericId(e.id)})" aria-label="Supprimer la dépense">✕</button></div>`;
   }).join('');
 }
@@ -1109,6 +1112,7 @@ function renderBudget(){
       <div class="s">${htmlText(co.fl)} ${htmlText(co.nm)} · ${htmlText(e.date||'')} · payé par ${payerName(e.by||'marie')} · ${expenseForLabel(e)}</div></div>
       <span class="ea" style="text-align:right">${orig?`${fmtCur(e.amt,e.cur)}<div style="font-size:10px;color:var(--muted);font-weight:600">≈ ${eur(toEur(e))}</div>`:eur(toEur(e))}</span>
       ${e.receipt?`<button class="del" style="color:var(--acc-d)" onclick="viewReceipt(${TravelSecurity.numericId(e.id)})" title="Voir le reçu">🧾</button>`:''}
+      <button class="del" onclick="openExpense(${TravelSecurity.numericId(e.id)})" aria-label="Modifier la dépense" title="Modifier la dépense">✏️</button>
       <button class="del" onclick="delExpense(${TravelSecurity.numericId(e.id)})">✕</button></div>`;});
   html+=`</div>`;
   $('#v-budget').innerHTML=html;
@@ -1360,12 +1364,15 @@ function gotoStage(id){nav('itin');const el=$('#stg-'+id);if(el){el.classList.ad
 
 /* ============ DÉPENSE ============ */
 let expSel={cat:'nourr',country:'cn'};
-function openExpense(){
+function openExpense(id=null){
+  const existing=id===null?null:S.expenses.find(e=>e.id===id);
+  if(id!==null&&!existing){toast("Cette dépense n’existe plus");return;}
   const cc=currentCountry()||(TRIP==='asie'&&TRIP_START&&today()<pd(TRIP_START)?'pretrip':'cn');
   expSel={cat:'nourr',country:cc,cur:(COUNTRY_CUR[cc]||'EUR'),by:meAsPayer(),for:'both',receipt:null};
-  const d=new Date().toISOString().slice(0,10);
+  if(existing)expSel={...expSel,id:existing.id,cat:existing.cat,country:existing.country,cur:existing.cur||'EUR',by:existing.by||'marie',for:expenseBeneficiary(existing),receipt:existing.receipt||null};
+  const d=existing?(existing.date||''):new Date().toISOString().slice(0,10);
   $('#modal').innerHTML=`<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="sheet">
-    <div class="grabber"></div><h3>Nouvelle dépense</h3>
+    <div class="grabber"></div><h3>${existing?'Modifier la dépense':'Nouvelle dépense'}</h3>
     <label class="fl-l">Devise (tu paies en monnaie locale)</label>
     <select id="e-cur" onchange="updateEurPreview();updateExpenseFor()">${CURRENCIES.map(c=>`<option value="${c.c}" ${c.c===expSel.cur?'selected':''}>${c.s} ${c.c} — ${c.nm}</option>`).join('')}</select>
     <label class="fl-l">Montant total payé (dans la devise)</label><input id="e-amt" type="number" inputmode="decimal" placeholder="0" step="0.01" oninput="updateEurPreview();updateExpenseFor()">
@@ -1377,11 +1384,17 @@ function openExpense(){
     <label class="fl-l">Description</label><input id="e-label" placeholder="Ex : guesthouse Yangshuo…">
     <label class="fl-l">Catégorie</label><div class="chips" id="e-cats">${CATS.map(c=>`<button class="chip ${c.id===expSel.cat?'on':''}" data-c="${c.id}" onclick="pickCat('${c.id}')">${c.fl} ${c.nm}</button>`).join('')}</div>
     <label class="fl-l">Pays / poste</label><div class="chips" id="e-cty">${BUDGET_PREVU.map(b=>`<button class="chip ${b.id===expSel.country?'on':''}" data-c="${b.id}" onclick="pickCty('${b.id}')">${htmlText(b.fl)} ${htmlText(b.nm)}</button>`).join('')}</div>
-    <label class="fl-l">Date</label><input id="e-date" type="date" value="${d}">
+    <label class="fl-l">Date</label><input id="e-date" type="date" value="${htmlText(d)}">
     <label class="fl-l">Reçu (photo, optionnel)</label>
     <input id="e-recu" type="file" accept="image/*" capture="environment" onchange="handleReceipt(this)">
     <div id="e-recu-prev" style="margin-top:8px"></div>
-    <button class="btn" onclick="addExpense()">Ajouter</button><button class="btn ghost" onclick="closeModal()">Annuler</button></div></div>`;
+    <button class="btn" onclick="addExpense()">${existing?"Enregistrer les modifications":"Ajouter"}</button><button class="btn ghost" onclick="closeModal()">Annuler</button></div></div>`;
+  if(existing){
+    $('#e-amt').value=existing.amt;
+    $('#e-label').value=existing.label||'';
+    if(expSel.receipt)$('#e-recu-prev').innerHTML=`<img src="${htmlText(TravelSecurity.imageURL(expSel.receipt))}" style="max-height:100px;border-radius:10px;border:1px solid var(--line)"> <button class="chip" onclick="clearReceipt()">✕ Retirer</button>`;
+  }
+  updateEurPreview();updateExpenseFor();
 }
 function handleReceipt(input){
   const f=input.files&&input.files[0];if(!f)return;
@@ -1410,10 +1423,13 @@ function expenseForRows(){const amt=Math.max(0,parseFloat($('#e-amt')?.value)||0
 function updateExpenseFor(){const rows=$('#e-for'),info=$('#e-share');if(rows)rows.innerHTML=expenseForRows();if(info)info.textContent=expSel.by==='joint'?(expSel.for==='both'?'Payé à moitié chacun avec le compte commun, pour vous deux. Aucun remboursement entre vous.':'Compte commun : paiement à moitié chacun, dépense pour '+payerName(expSel.for)+'. '+payerName(expSel.for)+' doit la moitié à '+payerName(otherPayer(expSel.for))+'.'):expSel.for==='both'?'Le montant est partagé à moitié entre Marie et Baptiste.':expSel.for===expSel.by?'Dépense personnelle : aucun remboursement à l’autre personne.':payerName(expSel.for)+' doit rembourser la totalité à '+payerName(expSel.by)+'.';}
 function toggleExpenseFor(id){if(!PAYERS.some(p=>p.id===id))return;if(expSel.for==='both')expSel.for=otherPayer(id);else if(expSel.for===id){toast('Garde au moins une personne cochée');}else expSel.for='both';updateExpenseFor();}
 function pickBy(id){if(!EXPENSE_PAYERS.some(p=>p.id===id))return;expSel.by=id;document.querySelectorAll('#e-by .chip').forEach(c=>c.classList.toggle('on',c.dataset.c===id));updateExpenseFor();}
-function addExpense(){const amt=parseFloat($('#e-amt').value);if(!amt||amt<=0){toast('Entre un montant valide');return;}
-  const cur=$('#e-cur')?$('#e-cur').value:'EUR';
-  S.expenses.push({id:Date.now(),amt,cur,by:expSel.by,for:PAYERS.some(p=>p.id===expSel.for)?expSel.for:'both',cat:expSel.cat,country:expSel.country,label:$('#e-label').value.trim(),date:$('#e-date').value,receipt:expSel.receipt||null});
-  save();closeModal();renderBudget();renderToday();toast('✓ Dépense ajoutée');}
+function addExpense(){const amt=parseFloat($('#e-amt').value);if(!Number.isFinite(amt)||amt<=0){toast('Entre un montant valide');return;}
+  const cur=$('#e-cur')?$('#e-cur').value:'EUR',editing=expSel.id!=null;
+  const index=editing?S.expenses.findIndex(e=>e.id===expSel.id):-1;
+  if(editing&&index<0){toast("Cette dépense n’existe plus");return;}
+  const expense={...(editing?S.expenses[index]:{}),id:editing?expSel.id:Date.now(),updatedAt:Date.now(),amt,cur,by:expSel.by,for:PAYERS.some(p=>p.id===expSel.for)?expSel.for:'both',cat:expSel.cat,country:expSel.country,label:$('#e-label').value.trim(),date:$('#e-date').value,receipt:expSel.receipt||null};
+  if(editing)S.expenses[index]=expense;else S.expenses.push(expense);
+  save();closeModal();renderBudget();renderToday();toast(editing?'✓ Dépense modifiée':'✓ Dépense ajoutée');}
 function closeModal(){searchResults=[];searchDocuments=[];$('#modal').innerHTML='';}
 
 /* ============ DONNÉES ============ */
