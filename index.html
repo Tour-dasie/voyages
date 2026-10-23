@@ -646,7 +646,7 @@ function openSync(){
 /* ============ APPLI INSTALLABLE + NOTIFICATIONS PUSH ============ */
 const VAPID_PUBLIC="BJrHrykUoHRgXFQHcJz03DBSvokJG43YUoATcuppRHl4FRBZU8nNlhd-YR6RAj5ckn49YPs17xa81rFj7lLul9s";
 let swReg=null,deferredInstall=null;
-const OFFLINE_CACHE='voyages-v27';
+const OFFLINE_CACHE='voyages-v28';
 const OFFLINE_FILES=['./','index.html','manifest.json','vols.html','icon-192.png','icon-512.png','apple-touch-icon.png','security.js','search.js','vendor/dompurify-3.4.16.min.js','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js'];
 async function prepareOffline(){
   const btn=$('#offline-prepare'),status=$('#offline-status');
@@ -670,7 +670,7 @@ function isStandalone(){return window.matchMedia('(display-mode: standalone)').m
 function isiOS(){return /iphone|ipad|ipod/i.test(navigator.userAgent);}
 function pushSupported(){return('serviceWorker'in navigator)&&('PushManager'in window)&&('Notification'in window);}
 function initPWA(){
-  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js?v=20261023-edit-expense',{updateViaCache:'none'}).then(r=>{swReg=r;r.update().catch(()=>{});}).catch(()=>{});}
+  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js?v=20261023-expense-date-order',{updateViaCache:'none'}).then(r=>{swReg=r;r.update().catch(()=>{});}).catch(()=>{});}
   window.addEventListener('beforeinstallprompt',ev=>{ev.preventDefault();deferredInstall=ev;});
   window.addEventListener('offline',()=>setSyncPill('off'));
   window.addEventListener('online',()=>{if(SYNC.user){bootTrips();if(syncActive())pushCloud(true);}fetchRates(true);});
@@ -685,7 +685,7 @@ async function enablePush(){
   if(isiOS()&&!isStandalone()){toast("iPhone : ajoute d'abord à l'écran d'accueil, puis rouvre depuis l'icône");return;}
   if(!pushSupported()){toast('Notifications non supportées sur ce navigateur');return;}
   try{
-    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js?v=20261023-edit-expense',{updateViaCache:'none'});
+    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js?v=20261023-expense-date-order',{updateViaCache:'none'});
     await navigator.serviceWorker.ready;
     const perm=await Notification.requestPermission();
     if(perm!=='granted'){toast('Notifications refusées dans les réglages');return;}
@@ -1038,8 +1038,9 @@ function fetchRates(force){
 const budgetOpenCountries=new Set();
 const budgetOpenCategories=new Set();
 function budgetMoney(value){return Number(value).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';}
+function expenseDateOrder(a,b){return String(a.date||'9999-12-31').localeCompare(String(b.date||'9999-12-31'))||a.id-b.id;}
 function budgetExpenseRows(expenses){
-  return [...expenses].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||b.id-a.id).map(e=>{
+  return [...expenses].sort(expenseDateOrder).map(e=>{
     const c=CATS.find(x=>x.id===e.cat)||{fl:'💸',nm:'Autre'},cur=e.cur||'EUR';
     const amount=Number(e.amt||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2});
     return `<div class="exp-item"><span class="em">${c.fl}</span><div class="ei"><div class="t">${htmlText(e.label||c.nm)}</div>
@@ -1104,9 +1105,9 @@ function renderBudget(){
   html+=`</div><div class="sec-title">Par catégorie</div><div class="card">`;
   CATS.forEach(c=>{const r=S.expenses.filter(e=>e.cat===c.id).reduce((a,e)=>a+toEur(e),0);
     html+=`<div class="cat-line"><span class="fl">${c.fl}</span><span class="nm">${c.nm}</span><span class="amt"><span class="r">${eur(r)}</span></span></div>`;});
-  html+=`</div><div class="sec-title">Dernières dépenses</div><div class="card">`;
+  html+=`</div><div class="sec-title">Dépenses · de la plus ancienne à la plus récente</div><div class="card">`;
   if(!S.expenses.length)html+=`<div class="empty">Aucune dépense.<br>Appuie sur <b>+</b> en bas à droite pour en ajouter.</div>`;
-  else [...S.expenses].sort((a,b)=>b.id-a.id).forEach(e=>{const c=CATS.find(x=>x.id===e.cat)||{fl:'💸'},co=BUDGET_PREVU.find(x=>x.id===e.country)||{fl:'🌏',nm:''};
+  else [...S.expenses].sort(expenseDateOrder).forEach(e=>{const c=CATS.find(x=>x.id===e.cat)||{fl:'💸'},co=BUDGET_PREVU.find(x=>x.id===e.country)||{fl:'🌏',nm:''};
     const orig=(e.cur&&e.cur!=='EUR');
     html+=`<div class="exp-item"><span class="em">${c.fl}</span><div class="ei"><div class="t">${htmlText(e.label||c.nm)}</div>
       <div class="s">${htmlText(co.fl)} ${htmlText(co.nm)} · ${htmlText(e.date||'')} · payé par ${payerName(e.by||'marie')} · ${expenseForLabel(e)}</div></div>
