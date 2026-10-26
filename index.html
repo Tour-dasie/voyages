@@ -180,7 +180,7 @@ header{position:sticky;top:0;z-index:20;background:rgba(244,239,231,.86);backdro
 .day{display:flex;gap:10px;padding:9px 0;border-top:1px solid var(--line);align-items:flex-start}
 .day .num{flex:0 0 auto;font-size:11px;font-weight:800;color:var(--acc-d);background:var(--acc-soft);border-radius:8px;padding:3px 7px;min-width:34px;text-align:center}
 .day .dtx{flex:1;font-size:13.3px}.day .dtx .dc{font-weight:700}
-.day.done .dtx,.block-h.done .bt{opacity:.45;text-decoration:line-through;text-decoration-color:var(--faint)}
+.block-h.done .bt{opacity:.45;text-decoration:line-through;text-decoration-color:var(--faint)}
 
 .cb{width:23px;height:23px;border-radius:8px;border:2px solid var(--line2);background:var(--card);
   display:flex;align-items:center;justify-content:center;flex:0 0 auto;transition:.15s}
@@ -328,6 +328,7 @@ body.locked header,body.locked main,body.locked .nav,body.locked #fab{display:no
 .tripitem .td2{font-size:12px;color:var(--muted);margin-top:1px}
 .tripitem .tok{color:var(--acc-d);font-weight:800;font-size:16px}
 .search-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.search-heading h3{margin:0}.search-sheet label{display:block;margin:16px 0 7px;font-size:14px}.search-sheet input{width:100%;font-size:16px}.search-context,#search-status{font-size:13px;color:var(--ink2)}.search-result h4{margin:8px 0;font-size:17px}.search-body{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.65;margin-bottom:14px}.search-sheet{max-width:760px}.search-result .btn{width:100%}@media(max-width:420px){.hrow{flex-wrap:wrap;gap:8px}.hbtns{gap:4px}.htitle{font-size:14px;gap:5px}.iconbtn{width:33px;height:35px}.brandmark{width:25px;height:25px}}
+.day-content>summary{cursor:pointer;font-weight:700;color:var(--ink)}.day-content>.day-program{margin-top:6px}.day.done .day-content>summary{color:var(--muted)}
 .day-actions{display:flex;gap:8px;margin:10px 0}.day-actions button{font:inherit;font-size:12px;border:1px solid var(--line);border-radius:8px;background:var(--card2);color:var(--ink2);padding:9px 12px}.day-grip{touch-action:none;cursor:grab}.day.drop-target{outline:2px solid var(--acc);background:var(--acc-soft)}.day.drag-source{opacity:.5}
 </style>
 </head>
@@ -646,7 +647,7 @@ function openSync(){
 /* ============ APPLI INSTALLABLE + NOTIFICATIONS PUSH ============ */
 const VAPID_PUBLIC="BJrHrykUoHRgXFQHcJz03DBSvokJG43YUoATcuppRHl4FRBZU8nNlhd-YR6RAj5ckn49YPs17xa81rFj7lLul9s";
 let swReg=null,deferredInstall=null;
-const OFFLINE_CACHE='voyages-v31';
+const OFFLINE_CACHE='voyages-v32';
 const OFFLINE_FILES=['./','index.html','manifest.json','vols.html','icon-192.png','icon-512.png','apple-touch-icon.png','security.js','search.js','vendor/dompurify-3.4.16.min.js','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js'];
 async function prepareOffline(){
   const btn=$('#offline-prepare'),status=$('#offline-status');
@@ -670,7 +671,7 @@ function isStandalone(){return window.matchMedia('(display-mode: standalone)').m
 function isiOS(){return /iphone|ipad|ipod/i.test(navigator.userAgent);}
 function pushSupported(){return('serviceWorker'in navigator)&&('PushManager'in window)&&('Notification'in window);}
 function initPWA(){
-  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js?v=20261026-keep-planning-open',{updateViaCache:'none'}).then(r=>{swReg=r;r.update().catch(()=>{});}).catch(()=>{});}
+  if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js?v=20261026-fold-completed-day',{updateViaCache:'none'}).then(r=>{swReg=r;r.update().catch(()=>{});}).catch(()=>{});}
   window.addEventListener('beforeinstallprompt',ev=>{ev.preventDefault();deferredInstall=ev;});
   window.addEventListener('offline',()=>setSyncPill('off'));
   window.addEventListener('online',()=>{if(SYNC.user){bootTrips();if(syncActive())pushCloud(true);}fetchRates(true);});
@@ -685,7 +686,7 @@ async function enablePush(){
   if(isiOS()&&!isStandalone()){toast("iPhone : ajoute d'abord à l'écran d'accueil, puis rouvre depuis l'icône");return;}
   if(!pushSupported()){toast('Notifications non supportées sur ce navigateur');return;}
   try{
-    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js?v=20261026-keep-planning-open',{updateViaCache:'none'});
+    if(!swReg)swReg=await navigator.serviceWorker.register('sw.js?v=20261026-fold-completed-day',{updateViaCache:'none'});
     await navigator.serviceWorker.ready;
     const perm=await Notification.requestPermission();
     if(perm!=='granted'){toast('Notifications refusées dans les réglages');return;}
@@ -843,7 +844,7 @@ function renderItin(){
   const root=$('#v-itin');
   // Preserve expanded and collapsed sections during progress and cloud updates.
   const sections=new Map([...root.querySelectorAll('.stage[id],.block[id]')].map(el=>[el.id,el.classList.contains('open')]));
-  const details=[...root.querySelectorAll('details')].map(el=>el.open);
+  const details=[...root.querySelectorAll('details:not(.day-content)')].map(el=>el.open);
   const t=today();let cur=null;for(const st of STAGES){if(t>=pd(st.start)&&t<pd(st.end)){cur=st;break;}}
   let html=`<div class="sec-title">${STAGES.length} étapes · ${tripDates()} · ${TRAVELERS} pers</div>${handbookHtml('itin')}${handbookHtml('open')}`;
   STAGES.forEach(st=>{
@@ -869,7 +870,7 @@ function renderItin(){
   });
   root.innerHTML=html;
   root.querySelectorAll('.stage[id],.block[id]').forEach(el=>{if(sections.has(el.id))el.classList.toggle('open',sections.get(el.id));});
-  root.querySelectorAll('details').forEach((el,i)=>{if(i<details.length)el.open=details[i];});
+  root.querySelectorAll('details:not(.day-content)').forEach((el,i)=>{if(i<details.length)el.open=details[i];});
 }
 function ring(pct){const r=15,c=2*Math.PI*r,off=c-(pct/100)*c;const col=pct>=100?'#8be0a4':'#ffffff';
   return `<div class="ring"><svg width="40" height="40">
@@ -936,7 +937,7 @@ function blockHtml(st,b){
         ${mapl}<div class="exp" onclick="toggleDays('${cssId(bid)}')">▾</div></div>
       ${destinationGuideHtml(b)}<div class="days">${scheduledDays(st,b).map(d=>{const done=S.days[st.id+'-'+d._programN];return`
         <div data-day-stage="${htmlText(st.id)}" data-day-block="${htmlText(b.c)}" data-day-n="${d.n}" class="day ${done?'done':''}"><div class="cb ${done?'on':''}" onclick="toggleDay('${st.id}',${d._programN})"></div>
-          <span class="num">J${d.n}</span><div class="dtx"><span class="dc">${htmlText(d.dt)}</span> — ${richHTML(d.t)}${dayGuideHtml(d)}${fichesHtml(st,b,d.sp)}<div class="day-actions"><button type="button" class="day-grip" aria-label="Glisser cette journée" onpointerdown="startDayDrag(event,this)">⠿ Glisser</button><button type="button" onclick="openDayMove('${st.id}',${d.n})">Déplacer</button></div></div></div>`;}).join('')}</div>${restoHtml(st,b)}${socialHtml(st,b)}</div>`;
+          <span class="num">J${d.n}</span><div class="dtx"><details class="day-content" ${done?'':'open'}><summary>Journée du ${htmlText(d.dt)}</summary><div class="day-program">${richHTML(d.t)}${dayGuideHtml(d)}${fichesHtml(st,b,d.sp)}<div class="day-actions"><button type="button" class="day-grip" aria-label="Glisser cette journée" onpointerdown="startDayDrag(event,this)">⠿ Glisser</button><button type="button" onclick="openDayMove('${st.id}',${d.n})">Déplacer</button></div></div></details></div></div>`;}).join('')}</div>${restoHtml(st,b)}${socialHtml(st,b)}</div>`;
   }
   const done=S.blocks[bid];
   return `<div class="block"><div class="block-h ${done?'done':''}">
