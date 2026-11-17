@@ -647,7 +647,7 @@ function openSync(){
 /* ============ APPLI INSTALLABLE + NOTIFICATIONS PUSH ============ */
 const VAPID_PUBLIC="BJrHrykUoHRgXFQHcJz03DBSvokJG43YUoATcuppRHl4FRBZU8nNlhd-YR6RAj5ckn49YPs17xa81rFj7lLul9s";
 let swReg=null,deferredInstall=null;
-const OFFLINE_CACHE='voyages-v34';
+const OFFLINE_CACHE='voyages-v35';
 const OFFLINE_FILES=['./','index.html','manifest.json','vols.html','icon-192.png','icon-512.png','apple-touch-icon.png','security.js','search.js','vendor/dompurify-3.4.16.min.js','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js'];
 async function prepareOffline(){
   const btn=$('#offline-prepare'),status=$('#offline-status');
@@ -1105,33 +1105,43 @@ function dailyBudgetModel(now=today()){
   const remainingCountryBudget=weight>0&&current?Math.max(0,available)*current.weight*current.days/weight:0;
   return {remainingCountryBudget,cap,spent,reserve,available,spentToday,allowance,left:Math.max(0,allowance-spentToday),current:current?.st,ended:now>=end,before:now<start};
 }
-// User-confirmed: existing Japan hotels 1,632.73 EUR + 200 EUR for Fukuoka.
-// The 850 EUR transport provision is an estimate for the entire Japan stay.
+// Fixed Japan envelope confirmed on 17 November; amounts are for two.
 function japanFoodActivityBudget(base,now=today()){
   if(!base||base.current?.id!=='jp'||base.ended)return base;
-  const transportEstimate=850,housingEstimate=1832.73;
+  const japanEnvelope=4000;
   const expenses=S.expenses.filter(e=>e.country==='jp');
   const amount=e=>{const n=toEur(e);return Number.isFinite(n)?n:0;};
   const paid=cat=>expenses.filter(e=>e.cat===cat).reduce((n,e)=>n+amount(e),0);
-  const transportReserve=Math.max(0,transportEstimate-paid('transp'));
-  const housingReserve=Math.max(0,housingEstimate-paid('heberg'));
+  // 900 EUR remains to be paid, in addition to the 63.37 EUR already recorded.
+  const transportReserve=Math.max(0,900-Math.max(0,paid('transp')-63.37));
+  const housingReserve=Math.max(0,200-Math.max(0,paid('heberg')-1632.73));
+  const japanSpent=expenses.reduce((n,e)=>n+amount(e),0);
   const days=Math.max(1,dbtw(now,pd(base.current.end)));
   const key=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
   const spentToday=expenses.filter(e=>e.date===key&&['nourr','activ'].includes(e.cat)).reduce((n,e)=>n+amount(e),0);
-  const available=base.remainingCountryBudget-transportReserve-housingReserve;
-  const allowance=Math.max(0,available+spentToday)/days;
-  return {...base,available,allowance,spentToday,left:Math.max(0,allowance-spentToday),transportReserve,housingReserve,foodActivitiesOnly:true};
+  const available=japanEnvelope-japanSpent-transportReserve-housingReserve;
+  const allowance=Math.max(0,available)/days;
+  return {...base,available,allowance,spentToday,left:allowance,transportReserve,housingReserve,japanEnvelope,japanSpent,days,foodActivitiesOnly:true};
 }
+// Refresh the remaining-day divisor after midnight or when returning to the app.
+let dailyBudgetRenderedDay=today().getTime();
+function refreshDailyBudgetDay(){
+  const day=today().getTime();
+  if(day===dailyBudgetRenderedDay||!STAGES.length||document.body.classList.contains('locked'))return;
+  dailyBudgetRenderedDay=day;renderToday();renderBudget();
+}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshDailyBudgetDay();});
+setInterval(refreshDailyBudgetDay,60000);
 function dailyBudgetHtml(){
   const b=japanFoodActivityBudget(dailyBudgetModel());if(!b)return '';
   if(b.ended)return `<div class="card"><b>Budget final · ${eur(b.cap)} pour deux</b><p>${b.spent>b.cap?'Dépassement : '+eur(b.spent-b.cap):'Solde : '+eur(b.cap-b.spent)}</p></div>`;
   return `<div class="sec-title">${b.foodActivitiesOnly?'Nourriture + activités · pour deux':'Votre repère quotidien · pour deux'}</div><div class="card">
     <span class="badge">${b.before?'Avant le départ':htmlText(b.current?b.current.fl+' '+b.current.nm:'En transit')}</span>
     <div style="font-size:28px;font-weight:700;margin:12px 0">${eur(b.allowance)} <small style="font-size:14px">/ jour</small></div>
-    <div>${b.before?'Repère du premier jour':'Aujourd’hui : '+eur(b.spentToday)+' saisis · reste '+eur(b.left)}</div>
-    ${b.spentToday>b.allowance?'<div style="color:var(--red);margin-top:8px">Repère dépassé aujourd’hui de '+eur(b.spentToday-b.allowance)+'. À compenser sur les prochains jours.</div>':''}
+    <div>${b.before?'Repère du premier jour':b.foodActivitiesOnly?'Aujourd’hui : '+eur(b.spentToday)+' de nourriture et activités saisis · '+b.days+' jours restants':'Aujourd’hui : '+eur(b.spentToday)+' saisis · reste '+eur(b.left)}</div>
+    ${!b.foodActivitiesOnly&&b.spentToday>b.allowance?'<div style="color:var(--red);margin-top:8px">Repère dépassé aujourd’hui de '+eur(b.spentToday-b.allowance)+'. À compenser sur les prochains jours.</div>':''}
     ${b.available<=0?'<div style="color:var(--red);margin-top:8px">'+(b.spent>b.cap?'Budget total dépassé.':'Le solde disponible est entièrement réservé aux frais à venir.')+'</div>':''}
-    <div class="info" style="margin-top:12px">Plafond : <b>${eur(b.cap)}</b> pour deux sur tout le voyage.<br>Réserve restante vols, assurance et autres postes hors pays : ${eur(b.reserve)}.<br>${b.foodActivitiesOnly?`Transports Japon restant à prévoir : <b>${eur(b.transportReserve)}</b> (provision totale estimée de 850 € pour deux, paiements déjà saisis déduits).<br>Hébergements Japon restant à prévoir : <b>${eur(b.housingReserve)}</b> (enveloppe totale de 1 832,73 €, dont 200 € estimés pour Fukuoka).<br>Ces deux réserves sont retirées de l’enveloppe Japon avant de calculer la moyenne. Le compteur du jour comprend uniquement les catégories Nourriture et Activités au Japon.<br>`:''}La somme disponible est répartie sur les jours restants selon les enveloppes de chaque pays. Toutes les dépenses saisies sont prises en compte, y compris les paiements anticipés. Un gros paiement peut dépasser le repère d’une journée.<br>Calcul selon les dates du planning, dont les étapes futures restent provisoires ; à jour si toutes les dépenses sont saisies.</div>
+    <div class="info" style="margin-top:12px">${b.foodActivitiesOnly?`Enveloppe Japon fixe : <b>${eur(b.japanEnvelope)}</b> pour deux.<br>Dépenses Japon saisies : ${eur(b.japanSpent)}.<br>Transports restant à payer : ${eur(b.transportReserve)} · Fukuoka : ${eur(b.housingReserve)}.<br><b>${eur(b.japanEnvelope)} − ${eur(b.japanSpent)} − ${eur(b.transportReserve)} − ${eur(b.housingReserve)} = ${eur(b.available)}</b> pour la nourriture et les activités.<br>Reste divisé par ${b.days} jours, aujourd’hui inclus et jour du départ exclu. La moyenne concerne ce qu’il reste à dépenser : les dépenses déjà saisies aujourd’hui sont déjà déduites.<br>Les réserves diminuent lorsque de nouveaux transports ou hébergements sont saisis au Japon. Le montant n’est plus redistribué depuis les autres pays.<br>Plafond voyage : ${eur(b.cap)} pour deux.`:`Plafond : <b>${eur(b.cap)}</b> pour deux sur tout le voyage.<br>Réserve restante vols, assurance et autres postes hors pays : ${eur(b.reserve)}.<br>La somme disponible est répartie sur les jours restants selon les enveloppes de chaque pays. Toutes les dépenses saisies sont prises en compte, y compris les paiements anticipés. Un gros paiement peut dépasser le repère d’une journée.<br>Calcul selon les dates du planning, dont les étapes futures restent provisoires ; à jour si toutes les dépenses sont saisies.`}</div>
   </div>`;
 }
 
