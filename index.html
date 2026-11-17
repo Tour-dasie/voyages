@@ -647,7 +647,7 @@ function openSync(){
 /* ============ APPLI INSTALLABLE + NOTIFICATIONS PUSH ============ */
 const VAPID_PUBLIC="BJrHrykUoHRgXFQHcJz03DBSvokJG43YUoATcuppRHl4FRBZU8nNlhd-YR6RAj5ckn49YPs17xa81rFj7lLul9s";
 let swReg=null,deferredInstall=null;
-const OFFLINE_CACHE='voyages-v32';
+const OFFLINE_CACHE='voyages-v33';
 const OFFLINE_FILES=['./','index.html','manifest.json','vols.html','icon-192.png','icon-512.png','apple-touch-icon.png','security.js','search.js','vendor/dompurify-3.4.16.min.js','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css','https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js','https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js'];
 async function prepareOffline(){
   const btn=$('#offline-prepare'),status=$('#offline-status');
@@ -773,13 +773,14 @@ function renderToday(){
       <div class="pmeta"><span>${pct}% parcouru</span><span>${dbtw(t,end)} jours restants</span></div>
     </div></div>`;
   }
-  const du=tripUnits(),dd=tripDone(),spent=S.expenses.reduce((a,e)=>a+toEur(e),0),prevu=BUDGET_PREVU.reduce((a,b)=>a+b.v,0);
+  const du=tripUnits(),dd=tripDone(),spent=S.expenses.reduce((a,e)=>a+toEur(e),0),prevu=TRIP==='asie'?24165:BUDGET_PREVU.reduce((a,b)=>a+b.v,0);
   html+=`<div class="stats">
     <div class="stat"><div class="n">${dd}</div><div class="l">jours faits</div></div>
     <div class="stat"><div class="n">${Math.round(dd/du*100)}%</div><div class="l">itinéraire</div></div>
     <div class="stat"><div class="n">${eur(spent)}</div><div class="l">dépensé</div></div>
   </div>`;
 
+  html+=dailyBudgetHtml();
   html+=handbookHtml('today');
   // prochain rappel
   const next=nextReminder();
@@ -1075,14 +1076,56 @@ function budgetCountryDetails(b){
     }).join('')}
     <div style="font-size:11px;color:var(--muted);margin-top:8px">Conversions et parts en euros selon les taux de change actuels du carnet.</div></div>`;
 }
+// Daily guidance uses country envelopes as relative weights; no expense is changed.
+function dailyBudgetModel(now=today()){
+  if(TRIP!=='asie'||!STAGES.length)return null;
+  const cap=24165, dayKey=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const key=dayKey(now), ids=new Set(STAGES.map(s=>s.id));
+  const amount=e=>{const v=toEur(e);return Number.isFinite(v)?v:0;};
+  const spent=S.expenses.reduce((n,e)=>n+amount(e),0);
+  const spentToday=S.expenses.filter(e=>e.date===key).reduce((n,e)=>n+amount(e),0);
+  const envelopes=STAGES.map(st=>({st,value:Math.max(0,Number((BUDGET_PREVU.find(b=>b.id===st.id)||{}).v)||Number(st.budget)||0)}));
+  const outside=S.expenses.filter(e=>!ids.has(e.country)).reduce((n,e)=>n+amount(e),0);
+  const reserve=Math.max(0,cap-envelopes.reduce((n,x)=>n+x.value,0)-outside);
+  const start=pd(TRIP_START),end=pd(TRIP_END),from=now<start?start:now;
+  const rows=envelopes.map(({st,value})=>{
+    const a=pd(st.start),b=pd(st.end),days=Math.max(1,dbtw(a,b));
+    return {st,weight:value/days,days:Math.max(0,dbtw(from>a?from:a,b))};
+  });
+  // Include calendar gaps as transit days so their costs are not silently omitted.
+  let gapDays=0;for(let d=new Date(from);d<end;d.setDate(d.getDate()+1)){
+    if(!STAGES.some(st=>d>=pd(st.start)&&d<pd(st.end)))gapDays++;
+  }
+  const average=rows.reduce((n,r)=>n+r.weight*Math.max(1,dbtw(pd(r.st.start),pd(r.st.end))),0)/Math.max(1,STAGES.reduce((n,st)=>n+Math.max(1,dbtw(pd(st.start),pd(st.end))),0));
+  const weight=rows.reduce((n,r)=>n+r.weight*r.days,0)+gapDays*average;
+  const current=rows.find(r=>now>=pd(r.st.start)&&now<pd(r.st.end));
+  const available=cap-spent-reserve;
+  // Today's recorded expenses count toward today's allowance, rather than lowering it twice.
+  const allowance=weight>0?Math.max(0,available+spentToday)*(current?current.weight:average)/weight:0;
+  return {cap,spent,reserve,available,spentToday,allowance,left:Math.max(0,allowance-spentToday),current:current?.st,ended:now>=end,before:now<start};
+}
+function dailyBudgetHtml(){
+  const b=dailyBudgetModel();if(!b)return '';
+  if(b.ended)return `<div class="card"><b>Budget final · ${eur(b.cap)} pour deux</b><p>${b.spent>b.cap?'Dépassement : '+eur(b.spent-b.cap):'Solde : '+eur(b.cap-b.spent)}</p></div>`;
+  return `<div class="sec-title">Votre repère quotidien · pour deux</div><div class="card">
+    <span class="badge">${b.before?'Avant le départ':htmlText(b.current?b.current.fl+' '+b.current.nm:'En transit')}</span>
+    <div style="font-size:28px;font-weight:700;margin:12px 0">${eur(b.allowance)} <small style="font-size:14px">/ jour</small></div>
+    <div>${b.before?'Repère du premier jour':'Aujourd’hui : '+eur(b.spentToday)+' saisis · reste '+eur(b.left)}</div>
+    ${b.spentToday>b.allowance?'<div style="color:var(--red);margin-top:8px">Repère dépassé aujourd’hui de '+eur(b.spentToday-b.allowance)+'. À compenser sur les prochains jours.</div>':''}
+    ${b.available<=0?'<div style="color:var(--red);margin-top:8px">'+(b.spent>b.cap?'Budget total dépassé.':'Le solde restant est entièrement réservé aux frais à venir.')+'</div>':''}
+    <div class="info" style="margin-top:12px">Plafond : <b>${eur(b.cap)}</b> pour deux sur tout le voyage.<br>Réserve restante vols, assurance et autres postes hors pays : ${eur(b.reserve)}.<br>La somme disponible est répartie sur les jours restants selon les enveloppes de chaque pays. Toutes les dépenses saisies sont prises en compte, y compris les paiements anticipés. Un gros paiement peut dépasser le repère d’une journée.<br>Calcul selon les dates du planning, dont les étapes futures restent provisoires ; à jour si toutes les dépenses sont saisies.</div>
+  </div>`;
+}
+
 function renderBudget(){
   if(expenseSortTrip!==TRIP){expenseSortTrip=TRIP;expenseSort=expenseSortPreference();}
-  const spent=S.expenses.reduce((a,e)=>a+toEur(e),0),prevu=BUDGET_PREVU.reduce((a,b)=>a+b.v,0);
+  const spent=S.expenses.reduce((a,e)=>a+toEur(e),0),prevu=TRIP==='asie'?24165:BUDGET_PREVU.reduce((a,b)=>a+b.v,0);
   let html=`<div class="lhero bud-hero"><span class="badge">Dépenses réelles · total en €</span>
     <div class="bud-tot">${eur(spent)}</div>
     <div class="pmeta" style="margin-top:6px">sur ${eur(prevu)} prévus · reste ${eur(prevu-spent)}</div>
     <div class="pbar"><i style="width:${Math.min(100,spent/prevu*100)}%"></i></div>
     <div class="pmeta"><span>${Math.round(spent/prevu*100)}% du budget</span><span>${eur(spent/TRAVELERS)}/pers</span></div></div>`;
+  html+=dailyBudgetHtml();
   html+=expenseSortControls();
   html+=handbookHtml('budget');
   html+=`<div style="text-align:center;margin:-4px 0 12px"><button class="chip" onclick="openRates()">💱 Taux de change</button></div>`;
